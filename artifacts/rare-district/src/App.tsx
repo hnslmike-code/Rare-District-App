@@ -30,6 +30,7 @@ import VendorProducts from '@/pages/vendor-dashboard/products/index';
 import VendorNewProduct from '@/pages/vendor-dashboard/products/new';
 
 // Admin
+import AdminLogin from '@/pages/admin/login';
 import AdminDashboard from '@/pages/admin/index';
 import AdminVendors from '@/pages/admin/vendors';
 import AdminProducts from '@/pages/admin/products';
@@ -53,7 +54,7 @@ const AdminRoute = ({ component: Component }: { component: React.ComponentType }
   const [, setLocation] = useLocation();
 
   useEffect(() => {
-    if (!isLoading && !isAdmin) setLocation("/");
+    if (!isLoading && !isAdmin) setLocation("/admin/login");
   }, [isAdmin, isLoading, setLocation]);
 
   if (isLoading || !isAdmin) return <div className="h-screen flex items-center justify-center text-muted-foreground text-sm tracking-widest uppercase">Loading...</div>;
@@ -134,6 +135,7 @@ function Router() {
       <Route path="/vendor-dashboard" component={() => <VendorRoute component={VendorDashboard} />} />
 
       {/* Admin */}
+      <Route path="/admin/login" component={AdminLogin} />
       <Route path="/admin/vendors" component={() => <AdminRoute component={AdminVendors} />} />
       <Route path="/admin/products" component={() => <AdminRoute component={AdminProducts} />} />
       <Route path="/admin/orders" component={() => <AdminRoute component={AdminOrders} />} />

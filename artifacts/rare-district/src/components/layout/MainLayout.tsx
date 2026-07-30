@@ -1,50 +1,143 @@
+import { useState, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, ShoppingBag, User as UserIcon, Menu } from "lucide-react";
+import { Search, ShoppingBag, User as UserIcon, Menu, X, ArrowRight } from "lucide-react";
 import { useGetWardrobe } from "@workspace/api-client-react";
+
+const NAV_LINKS = [
+  { href: "/shop", label: "Shop" },
+  { href: "/shop?category=new", label: "New Arrivals" },
+  { href: "/shop?category=designers", label: "Designers" },
+  { href: "/shop?category=editorial", label: "Editorial" },
+];
 
 export function MainLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, currentUser, logout } = useAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Guard query carefully - if it fails for unauthenticated users, it's fine, we disable it.
   const { data: wardrobe } = useGetWardrobe({
     query: {
       enabled: isAuthenticated,
-      queryKey: ["wardrobe"]
-    }
+      queryKey: ["wardrobe"],
+    },
   });
 
-  const wardrobeCount = wardrobe?.items?.length || 0;
+  // API returns WardrobeItem[] directly
+  const wardrobeCount = Array.isArray(wardrobe) ? wardrobe.length : 0;
+
+  // Close menus on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setSearchOpen(false);
+    setUserMenuOpen(false);
+  }, [location]);
+
+  // Focus search input when opened
+  useEffect(() => {
+    if (searchOpen) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [searchOpen]);
+
+  // Close user menu when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    }
+    if (userMenuOpen) document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [userMenuOpen]);
+
+  // Prevent body scroll when mobile menu or search is open
+  useEffect(() => {
+    document.body.style.overflow = mobileMenuOpen || searchOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileMenuOpen, searchOpen]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      setSearchOpen(false);
+      setSearchQuery("");
+      setLocation(`/shop?search=${encodeURIComponent(searchQuery.trim())}`);
+    }
+  };
+
+  const isNavActive = (href: string) => {
+    if (href === "/shop" && !href.includes("?")) {
+      return location === "/shop";
+    }
+    return location.startsWith(href.split("?")[0]) && location === "/shop" && href.includes("?") 
+      ? window.location.search.includes(href.split("?")[1]) 
+      : false;
+  };
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20">
-      <header className="sticky top-0 z-50 w-full bg-background/90 backdrop-blur-md border-b border-border/50 transition-all duration-300">
-        <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <button className="md:hidden text-foreground hover:text-primary transition-colors">
+      {/* ── Top Header ── */}
+      <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-md border-b border-border/50">
+        <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between gap-4">
+          {/* Left: hamburger + logo */}
+          <div className="flex items-center gap-4">
+            <button
+              className="md:hidden text-foreground hover:text-primary transition-colors p-1"
+              aria-label="Open menu"
+              onClick={() => setMobileMenuOpen(true)}
+            >
               <Menu className="w-6 h-6" />
             </button>
-            <Link href="/" className="font-serif text-2xl md:text-3xl font-bold tracking-widest uppercase text-foreground hover:text-primary transition-colors">
+            <Link
+              href="/"
+              className="font-serif text-2xl md:text-3xl font-bold tracking-widest uppercase text-foreground hover:text-primary transition-colors"
+            >
               Rare District
             </Link>
           </div>
 
+          {/* Centre: desktop nav */}
           <nav className="hidden md:flex items-center gap-8 text-sm uppercase tracking-widest font-medium">
-            <Link href="/shop" className="text-foreground hover:text-primary transition-colors">Shop</Link>
-            <Link href="/shop?category=new" className="text-foreground hover:text-primary transition-colors">New Arrivals</Link>
-            <Link href="/shop?category=designers" className="text-foreground hover:text-primary transition-colors">Designers</Link>
-            <Link href="/shop?category=editorial" className="text-foreground hover:text-primary transition-colors">Editorial</Link>
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`transition-colors border-b-2 pb-0.5 ${
+                  location === link.href.split("?")[0] && link.href === "/shop" && !link.href.includes("?")
+                    ? "text-foreground border-foreground"
+                    : "text-muted-foreground hover:text-foreground border-transparent hover:border-foreground/30"
+                }`}
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
 
-          <div className="flex items-center gap-5">
-            <button className="text-foreground hover:text-primary transition-colors">
+          {/* Right: actions */}
+          <div className="flex items-center gap-4 md:gap-5">
+            {/* Search */}
+            <button
+              className="text-foreground hover:text-primary transition-colors"
+              aria-label="Search"
+              onClick={() => setSearchOpen(true)}
+            >
               <Search className="w-5 h-5" strokeWidth={1.5} />
             </button>
-            
+
             {isAuthenticated ? (
               <>
-                <Link href="/wardrobe" className="relative text-foreground hover:text-primary transition-colors">
+                {/* Wardrobe */}
+                <Link
+                  href="/wardrobe"
+                  className="relative text-foreground hover:text-primary transition-colors"
+                  aria-label="Wardrobe"
+                >
                   <ShoppingBag className="w-5 h-5" strokeWidth={1.5} />
                   {wardrobeCount > 0 && (
                     <span className="absolute -top-2 -right-2 w-4 h-4 flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-bold rounded-full">
@@ -52,36 +145,63 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                     </span>
                   )}
                 </Link>
-                <div className="group relative">
-                  <button className="text-foreground hover:text-primary transition-colors flex items-center gap-2">
+
+                {/* User menu */}
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    className="text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
+                    onClick={() => setUserMenuOpen((v) => !v)}
+                    aria-label="Account"
+                    aria-expanded={userMenuOpen}
+                  >
                     <UserIcon className="w-5 h-5" strokeWidth={1.5} />
                   </button>
-                  <div className="absolute right-0 top-full pt-4 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 w-48 z-50">
-                    <div className="bg-background border border-border p-2 shadow-xl flex flex-col">
-                      <div className="px-4 py-2 border-b border-border/50 mb-2">
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Signed in as</p>
+
+                  {userMenuOpen && (
+                    <div className="absolute right-0 top-full mt-3 w-52 bg-background border border-border shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="px-4 py-3 border-b border-border">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Signed in as</p>
                         <p className="text-sm font-medium truncate">{currentUser?.name || currentUser?.email}</p>
+                        <p className="text-xs text-muted-foreground capitalize tracking-widest">{currentUser?.role}</p>
                       </div>
-                      <Link href="/orders" className="px-4 py-2 text-sm hover:bg-secondary transition-colors">My Orders</Link>
-                      <Link href="/rewards" className="px-4 py-2 text-sm hover:bg-secondary transition-colors">My Rewards</Link>
-                      {currentUser?.role === 'vendor' && (
-                        <Link href="/vendor-dashboard" className="px-4 py-2 text-sm hover:bg-secondary transition-colors">Vendor Dashboard</Link>
-                      )}
-                      {currentUser?.role === 'admin' && (
-                        <Link href="/admin" className="px-4 py-2 text-sm hover:bg-secondary transition-colors text-primary">Admin Panel</Link>
-                      )}
-                      <button 
-                        onClick={() => { logout(); setLocation("/"); }}
-                        className="px-4 py-2 text-sm hover:bg-secondary transition-colors text-left text-destructive mt-2"
-                      >
-                        Sign Out
-                      </button>
+                      <div className="py-1">
+                        <Link href="/orders" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors">
+                          My Orders
+                        </Link>
+                        <Link href="/rewards" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors">
+                          My Rewards
+                        </Link>
+                        <Link href="/wardrobe" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors">
+                          My Wardrobe
+                        </Link>
+                        {currentUser?.role === "vendor" && (
+                          <Link href="/vendor-dashboard" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors border-t border-border mt-1 pt-2.5">
+                            Vendor Dashboard
+                          </Link>
+                        )}
+                        {currentUser?.role === "admin" && (
+                          <Link href="/admin" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors text-primary font-medium border-t border-border mt-1 pt-2.5">
+                            Admin Panel
+                          </Link>
+                        )}
+                      </div>
+                      <div className="border-t border-border py-1">
+                        <button
+                          onClick={() => { logout(); setLocation("/"); setUserMenuOpen(false); }}
+                          className="w-full text-left px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                        >
+                          Sign Out
+                        </button>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </>
             ) : (
-              <Link href="/login" className="text-sm uppercase tracking-widest font-medium hover:text-primary transition-colors">
+              <Link
+                href="/login"
+                className="text-sm uppercase tracking-widest font-medium hover:text-primary transition-colors"
+              >
                 Sign In
               </Link>
             )}
@@ -89,10 +209,132 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1">
-        {children}
-      </main>
+      {/* ── Search Overlay ── */}
+      {searchOpen && (
+        <div
+          className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center px-6 animate-in fade-in duration-200"
+          onClick={(e) => { if (e.target === e.currentTarget) setSearchOpen(false); }}
+        >
+          <button
+            className="absolute top-6 right-6 text-foreground hover:text-primary transition-colors"
+            onClick={() => setSearchOpen(false)}
+            aria-label="Close search"
+          >
+            <X className="w-7 h-7" />
+          </button>
+          <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-8">Search the District</p>
+          <form onSubmit={handleSearch} className="w-full max-w-xl">
+            <div className="relative">
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search products, designers…"
+                className="w-full bg-transparent border-0 border-b-2 border-foreground/30 focus:border-foreground outline-none font-serif text-3xl md:text-4xl py-3 pr-12 placeholder:text-muted-foreground/40 text-foreground transition-colors"
+              />
+              <button type="submit" className="absolute right-0 top-1/2 -translate-y-1/2 text-foreground hover:text-primary transition-colors">
+                <ArrowRight className="w-7 h-7" />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
+      {/* ── Mobile Menu ── */}
+      {mobileMenuOpen && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-[55] bg-foreground/50 backdrop-blur-sm animate-in fade-in duration-200"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+          {/* Drawer */}
+          <div className="fixed top-0 left-0 h-full w-[280px] bg-background z-[60] flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
+            <div className="flex items-center justify-between px-6 h-20 border-b border-border">
+              <span className="font-serif text-lg font-bold tracking-widest uppercase">Menu</span>
+              <button onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <nav className="flex-1 px-6 py-8 space-y-1 overflow-y-auto">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-4">Shop</p>
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors"
+                >
+                  {link.label}
+                  <ArrowRight className="w-4 h-4 opacity-30" />
+                </Link>
+              ))}
+
+              {isAuthenticated && (
+                <>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mt-8 mb-4">Account</p>
+                  <Link href="/orders" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
+                    My Orders <ArrowRight className="w-4 h-4 opacity-30" />
+                  </Link>
+                  <Link href="/wardrobe" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
+                    My Wardrobe <ArrowRight className="w-4 h-4 opacity-30" />
+                  </Link>
+                  <Link href="/rewards" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
+                    My Rewards <ArrowRight className="w-4 h-4 opacity-30" />
+                  </Link>
+                  {currentUser?.role === "vendor" && (
+                    <Link href="/vendor-dashboard" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
+                      Vendor Dashboard <ArrowRight className="w-4 h-4 opacity-30" />
+                    </Link>
+                  )}
+                  {currentUser?.role === "admin" && (
+                    <Link href="/admin" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-primary border-b border-border/40 transition-colors">
+                      Admin Panel <ArrowRight className="w-4 h-4 opacity-50" />
+                    </Link>
+                  )}
+                </>
+              )}
+
+              {!isAuthenticated && (
+                <>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mt-8 mb-4">Account</p>
+                  <Link href="/login" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
+                    Sign In <ArrowRight className="w-4 h-4 opacity-30" />
+                  </Link>
+                  <Link href="/register" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
+                    Register <ArrowRight className="w-4 h-4 opacity-30" />
+                  </Link>
+                </>
+              )}
+            </nav>
+
+            {isAuthenticated && (
+              <div className="px-6 py-6 border-t border-border">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-9 h-9 bg-secondary flex items-center justify-center font-serif text-base flex-shrink-0">
+                    {currentUser?.name?.charAt(0) || currentUser?.email?.charAt(0)}
+                  </div>
+                  <div className="overflow-hidden">
+                    <p className="text-sm font-medium truncate">{currentUser?.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{currentUser?.email}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { logout(); setLocation("/"); setMobileMenuOpen(false); }}
+                  className="w-full text-left text-sm text-destructive hover:text-destructive/80 font-medium transition-colors uppercase tracking-widest"
+                >
+                  Sign Out
+                </button>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      <main className="flex-1">{children}</main>
+
+      {/* ── Footer ── */}
       <footer className="bg-foreground text-background py-16 md:py-24 mt-auto">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
@@ -114,7 +356,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
               <h3 className="font-serif text-lg mb-6 text-primary-foreground">Assistance</h3>
               <ul className="space-y-4 text-sm text-muted">
                 <li><button className="hover:text-primary transition-colors">Contact Us</button></li>
-                <li><button className="hover:text-primary transition-colors">Shipping & Returns</button></li>
+                <li><button className="hover:text-primary transition-colors">Shipping &amp; Returns</button></li>
                 <li><button className="hover:text-primary transition-colors">Terms of Service</button></li>
               </ul>
             </div>
