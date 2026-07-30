@@ -1,0 +1,28 @@
+import { pgTable, text, serial, timestamp, numeric, pgEnum } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
+import { usersTable } from "./users";
+
+export const vendorStatusEnum = pgEnum("vendor_status", ["pending", "approved", "rejected"]);
+
+export const vendorsTable = pgTable("vendors", {
+  id: serial("id").primaryKey(),
+  userId: serial("user_id").notNull().references(() => usersTable.id),
+  brandName: text("brand_name").notNull(),
+  description: text("description"),
+  logoUrl: text("logo_url"),
+  website: text("website"),
+  bankName: text("bank_name"),
+  accountNumber: text("account_number"),
+  accountName: text("account_name"),
+  status: vendorStatusEnum("status").notNull().default("pending"),
+  commissionRateOverride: numeric("commission_rate_override", { precision: 5, scale: 2 }),
+  payoutBalance: numeric("payout_balance", { precision: 12, scale: 2 }).notNull().default("0"),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const insertVendorSchema = createInsertSchema(vendorsTable).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertVendor = z.infer<typeof insertVendorSchema>;
+export type Vendor = typeof vendorsTable.$inferSelect;

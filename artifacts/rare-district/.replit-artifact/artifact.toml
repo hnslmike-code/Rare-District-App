@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Rare District"
+version = "1.0.0"
+id = "artifacts/rare-district"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19561
+
+[services.development]
+run = "pnpm --filter @workspace/rare-district run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/rare-district", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/rare-district/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19561"
+BASE_PATH = "/"
