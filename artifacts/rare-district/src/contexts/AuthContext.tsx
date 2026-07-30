@@ -1,5 +1,9 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { useGetMe, User } from '@workspace/api-client-react';
+import { useGetMe, User, setAuthTokenGetter } from '@workspace/api-client-react';
+
+// Register once at module load — every API call will read the latest token
+// from localStorage and attach it as Authorization: Bearer <token>
+setAuthTokenGetter(() => localStorage.getItem('token'));
 
 interface AuthContextType {
   currentUser: User | null;
