@@ -32,7 +32,7 @@ export async function seedDemoData() {
   const [adminUser] = await db.insert(usersTable).values({
     email: "admin@raredistrict.com",
     name: "Rare District Admin",
-    passwordHash: await hashPassword("admin123"),
+    passwordHash: await hashPassword(process.env.ADMIN_SEED_PASSWORD ?? "change-me-on-first-boot"),
     role: "admin",
     referralCode: "ADMIN001",
   }).returning();
@@ -42,21 +42,21 @@ export async function seedDemoData() {
     db.insert(usersTable).values({
       email: "anika@luxurybyanika.com",
       name: "Anika Osei",
-      passwordHash: await hashPassword("vendor123"),
+      passwordHash: await hashPassword(process.env.VENDOR_SEED_PASSWORD ?? "change-me-on-first-boot"),
       role: "vendor",
       referralCode: generateReferralCode(),
     }).returning(),
     db.insert(usersTable).values({
       email: "zara@zarastudiong.com",
       name: "Zara Adewale",
-      passwordHash: await hashPassword("vendor123"),
+      passwordHash: await hashPassword(process.env.VENDOR_SEED_PASSWORD ?? "change-me-on-first-boot"),
       role: "vendor",
       referralCode: generateReferralCode(),
     }).returning(),
     db.insert(usersTable).values({
       email: "kola@thekollection.ng",
       name: "Kola Fashola",
-      passwordHash: await hashPassword("vendor123"),
+      passwordHash: await hashPassword(process.env.VENDOR_SEED_PASSWORD ?? "change-me-on-first-boot"),
       role: "vendor",
       referralCode: generateReferralCode(),
     }).returning(),
@@ -117,7 +117,7 @@ export async function seedDemoData() {
   const [shopper] = await db.insert(usersTable).values({
     email: "demo@shopper.com",
     name: "Demo Shopper",
-    passwordHash: await hashPassword("shopper123"),
+    passwordHash: await hashPassword(process.env.VENDOR_SEED_PASSWORD ?? "change-me-on-first-boot"),
     role: "shopper",
     referralCode: generateReferralCode(),
   }).returning();
@@ -144,5 +144,5 @@ export async function seedDemoData() {
     isReferral: false,
   });
 
-  logger.info("Seeding complete. Demo accounts: admin@raredistrict.com / admin123 | demo@shopper.com / shopper123 | anika@luxurybyanika.com / vendor123");
+  logger.info("Seeding complete. Initial accounts created — change passwords before going live.");
 }
