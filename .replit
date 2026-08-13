@@ -11,6 +11,43 @@ env = { "CI" = "true" }
 [workflows]
 runButton = "Project"
 
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Rare District API"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Rare District Frontend"
+
+[[workflows.workflow]]
+name = "Rare District API"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "console"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=8080 pnpm --filter @workspace/api-server run dev"
+waitForPort = 8080
+
+[[workflows.workflow]]
+name = "Rare District Frontend"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=19561 BASE_PATH=/ pnpm --filter @workspace/rare-district run dev"
+waitForPort = 19561
+
 [agent]
 stack = "PNPM_WORKSPACE"
 expertMode = true
