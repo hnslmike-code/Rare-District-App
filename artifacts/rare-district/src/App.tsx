@@ -15,6 +15,7 @@ import Home from '@/pages/home';
 import Shop from '@/pages/shop';
 import ProductDetail from '@/pages/product';
 import VendorPage from '@/pages/vendor';
+import Lookbook from '@/pages/lookbook';
 import Wardrobe from '@/pages/wardrobe';
 import Checkout from '@/pages/checkout';
 import Login from '@/pages/login';
@@ -118,6 +119,7 @@ function Router() {
       <Route path="/shop" component={() => <PublicRoute component={Shop} />} />
       <Route path="/product/:id" component={() => <PublicRoute component={ProductDetail} />} />
       <Route path="/vendor/:id" component={() => <PublicRoute component={VendorPage} />} />
+      <Route path="/lookbook/:id" component={() => <PublicRoute component={Lookbook} />} />
       <Route path="/login" component={() => <PublicRoute component={Login} />} />
       <Route path="/register" component={() => <PublicRoute component={Register} />} />
 

@@ -75,6 +75,7 @@ export default function VendorPage() {
               )}
               <div className="flex gap-6 items-center text-sm text-muted-foreground">
                 <span className="font-medium">{products.length} pieces</span>
+                <Link href={`/lookbook/${vendor.id}`} className="font-bold tracking-widest uppercase text-xs text-primary hover:text-foreground" data-testid={`link-vendor-lookbook-${vendor.id}`}>View lookbook</Link>
                 {vendor.website && (
                   <a href={vendor.website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
                     <Globe className="w-3.5 h-3.5" />

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useGetAdminSettings, useUpdateAdminSettings, getGetAdminSettingsQueryKey } from "@workspace/api-client-react";
+import { useGetAdminSettings, useUpdateAdminSettings, getGetAdminSettingsQueryKey, type AdminSettingsUpdateReferralRewardType, type AdminSettingsUpdateShareRewardType } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -25,9 +25,9 @@ export default function AdminSettings() {
 
   const [form, setForm] = useState({
     defaultCommissionRate: "5",
-    referralRewardType: "fixed",
+    referralRewardType: "fixed" as AdminSettingsUpdateReferralRewardType,
     referralRewardValue: "500",
-    shareRewardType: "fixed",
+    shareRewardType: "fixed" as AdminSettingsUpdateShareRewardType,
     shareRewardValue: "250",
   });
 
@@ -35,9 +35,9 @@ export default function AdminSettings() {
     if (settings) {
       setForm({
         defaultCommissionRate: String(settings.defaultCommissionRate),
-        referralRewardType: settings.referralRewardType ?? "fixed",
+         referralRewardType: (settings.referralRewardType ?? "fixed") as AdminSettingsUpdateReferralRewardType,
         referralRewardValue: String(settings.referralRewardValue),
-        shareRewardType: settings.shareRewardType ?? "fixed",
+         shareRewardType: (settings.shareRewardType ?? "fixed") as AdminSettingsUpdateShareRewardType,
         shareRewardValue: String(settings.shareRewardValue),
       });
     }
@@ -98,7 +98,7 @@ export default function AdminSettings() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-xs font-bold tracking-widest uppercase">Type</Label>
-              <Select value={form.referralRewardType} onValueChange={v => setForm(f => ({ ...f, referralRewardType: v }))}>
+               <Select value={form.referralRewardType} onValueChange={v => setForm(f => ({ ...f, referralRewardType: v as AdminSettingsUpdateReferralRewardType }))}>
                 <SelectTrigger className="rounded-none"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fixed">Fixed (₦)</SelectItem>
@@ -125,7 +125,7 @@ export default function AdminSettings() {
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-xs font-bold tracking-widest uppercase">Type</Label>
-              <Select value={form.shareRewardType} onValueChange={v => setForm(f => ({ ...f, shareRewardType: v }))}>
+               <Select value={form.shareRewardType} onValueChange={v => setForm(f => ({ ...f, shareRewardType: v as AdminSettingsUpdateShareRewardType }))}>
                 <SelectTrigger className="rounded-none"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="fixed">Fixed (₦)</SelectItem>

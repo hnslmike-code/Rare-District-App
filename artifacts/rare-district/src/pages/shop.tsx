@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useListProducts, ListProductsSortBy } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -27,31 +27,33 @@ export default function Shop() {
   const [page, setPage] = useState(1);
 
   // Simple debounce for search
-  useState(() => {
+  useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(search), 500);
     return () => clearTimeout(handler);
   }, [search]);
 
   const { data: productsData, isLoading } = useListProducts({
-    query: {
-      queryKey: ["products", category, debouncedSearch, sortBy, page]
-    },
     category: category || undefined,
     search: debouncedSearch || undefined,
     sortBy,
     page,
     limit: 12
+  }, {
+    query: {
+      queryKey: ["products", category, debouncedSearch, sortBy, page]
+    }
   });
 
   const categories = ["All", "new", "designers", "editorial", "tops", "bottoms", "dresses", "outerwear", "accessories"];
 
   return (
-    <div className="min-h-screen bg-background pt-10 pb-24">
+    <div className="min-h-screen bg-background pt-10 pb-24 nebula-surface">
       <div className="container mx-auto px-4 md:px-6">
         
         {/* Header */}
-        <div className="mb-12">
-          <h1 className="font-serif text-4xl md:text-5xl font-bold tracking-tight mb-4">The Collection</h1>
+         <div className="mb-12 border-b border-border/70 pb-12">
+           <p className="text-primary text-xs uppercase tracking-[0.3em] mb-4">Rare District / Showroom</p>
+           <h1 className="font-serif text-4xl md:text-6xl font-medium tracking-tight mb-4">The Collection</h1>
           <p className="text-muted-foreground text-lg max-w-2xl">
             {category ? `Exploring ${category} pieces from our curated selection.` : "Explore our curated selection of vanguard pieces."}
           </p>
@@ -151,7 +153,7 @@ export default function Shop() {
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 md:gap-x-10 md:gap-y-16">
               {productsData.items.map((product) => (
                 <Link key={product.id} href={`/product/${product.id}`} className="group block">
-                  <div className="aspect-[3/4] overflow-hidden bg-secondary mb-6 relative">
+                   <div className="aspect-[3/4] overflow-hidden bg-secondary mb-6 relative luxury-image">
                     {product.images?.[0] ? (
                       <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out" />
                     ) : (

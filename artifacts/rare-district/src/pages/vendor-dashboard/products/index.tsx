@@ -16,12 +16,13 @@ export default function VendorProducts() {
   const vendorId = profile?.id;
 
   const { data: productsData, isLoading } = useListProducts({
+    vendorId,
+    limit: 50
+  }, {
     query: {
       enabled: !!vendorId,
       queryKey: ["vendor-products", vendorId]
     },
-    vendorId: vendorId,
-    limit: 50
   });
 
   return (

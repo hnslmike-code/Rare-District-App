@@ -1,4 +1,4 @@
-import { useListAdminOrders, useUpdateOrderStatus, getListAdminOrdersQueryKey } from "@workspace/api-client-react";
+import { useListAdminOrders, useUpdateOrderStatus, getListAdminOrdersQueryKey, type OrderStatusUpdateStatus } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ShoppingCart } from "lucide-react";
@@ -31,7 +31,7 @@ export default function AdminOrders() {
     }
   });
 
-  const statusOptions = ["pending", "paid", "processing", "shipped", "delivered", "cancelled"];
+  const statusOptions: OrderStatusUpdateStatus[] = ["processing", "shipped", "delivered", "cancelled"];
 
   return (
     <div className="space-y-8" data-testid="admin-orders">
@@ -68,7 +68,7 @@ export default function AdminOrders() {
                   <td className="py-4 px-4">
                     <Select
                       value={order.status}
-                      onValueChange={(v) => updateStatus.mutate({ id: order.id, data: { status: v } })}
+                       onValueChange={(v) => updateStatus.mutate({ id: order.id, data: { status: v as OrderStatusUpdateStatus } })}
                     >
                       <SelectTrigger className={`w-36 h-7 text-xs rounded-none border-none shadow-none font-bold tracking-widest uppercase ${statusColors[order.status] ?? "bg-secondary"}`}>
                         <SelectValue />

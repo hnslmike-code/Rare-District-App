@@ -1,12 +1,15 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { Link, useRoute } from "wouter";
 import { useGetProduct, useGetProductReviews, useAddToWardrobe, getGetWardrobeQueryKey } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
-import { ArrowLeft, Star, Heart, Share2, Info, ChevronRight } from "lucide-react";
+import { Heart, Share2, ChevronRight, Ruler } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function ProductDetail() {
   const [, params] = useRoute("/product/:id");
@@ -16,6 +19,9 @@ export default function ProductDetail() {
 
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [activeImage, setActiveImage] = useState<number>(0);
+  const [height, setHeight] = useState("");
+  const [usualSize, setUsualSize] = useState("");
+  const [fitPreference, setFitPreference] = useState("regular");
 
   const { data: product, isLoading } = useGetProduct(id, {
     query: {
@@ -80,7 +86,7 @@ export default function ProductDetail() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-12 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-12">
+      <div className="container mx-auto px-4 py-12 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-12 nebula-surface">
         <Skeleton className="aspect-[3/4] w-full rounded-none" />
         <div className="space-y-8 mt-12">
           <Skeleton className="h-8 w-1/4 rounded-none" />
@@ -106,9 +112,16 @@ export default function ProductDetail() {
   }
 
   const hasSizes = product.sizes && product.sizes.length > 0;
+  const fitRecommendation = (() => {
+    if (!product.sizes?.length || !usualSize) return "";
+    const sizes = product.sizes;
+    const index = Math.max(0, sizes.findIndex((size) => size.toUpperCase() === usualSize.toUpperCase()));
+    const adjusted = fitPreference === "relaxed" ? index + 1 : fitPreference === "close" ? index - 1 : index;
+    return sizes[Math.min(Math.max(adjusted, 0), sizes.length - 1)];
+  })();
 
   return (
-    <div className="bg-background pt-8 pb-32">
+    <div className="bg-background pt-8 pb-32 nebula-surface">
       <div className="container mx-auto px-4 md:px-6">
         
         {/* Breadcrumb */}
@@ -140,7 +153,7 @@ export default function ProductDetail() {
             )}
             
             {/* Main Image */}
-            <div className="flex-1 aspect-[3/4] bg-secondary relative overflow-hidden group">
+             <div className="flex-1 aspect-[3/4] bg-secondary relative overflow-hidden group luxury-image">
               {product.images?.[activeImage] ? (
                 <img 
                   src={product.images[activeImage]} 
@@ -168,7 +181,31 @@ export default function ProductDetail() {
               <div className="mb-10">
                 <div className="flex justify-between items-end mb-4">
                   <span className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Select Size</span>
-                  <button className="text-xs underline text-muted-foreground hover:text-foreground transition-colors">Size Guide</button>
+                   <Dialog>
+                     <DialogTrigger asChild>
+                       <button className="inline-flex items-center gap-1.5 text-xs underline text-muted-foreground hover:text-foreground transition-colors" data-testid="button-size-guide">
+                         <Ruler className="w-3.5 h-3.5" /> Size Guide
+                       </button>
+                     </DialogTrigger>
+                     <DialogContent className="rounded-none border-primary/30">
+                       <DialogHeader>
+                         <DialogTitle className="font-serif text-3xl">Size guide</DialogTitle>
+                         <DialogDescription>Standard body measurements. When between sizes, consider your preferred fit.</DialogDescription>
+                       </DialogHeader>
+                       <div className="border-y border-border mt-4" data-testid="size-guide-table">
+                         {[
+                           ["XS", "84–88 cm", "66–70 cm", "88–92 cm"],
+                           ["S", "88–92 cm", "70–74 cm", "92–96 cm"],
+                           ["M", "92–96 cm", "74–78 cm", "96–100 cm"],
+                           ["L", "96–102 cm", "78–84 cm", "100–106 cm"],
+                           ["XL", "102–108 cm", "84–90 cm", "106–112 cm"],
+                           ["2XL", "108–114 cm", "90–96 cm", "112–118 cm"],
+                         ].map(([size, bust, waist, hip]) => <div key={size} className="grid grid-cols-4 py-3 text-sm border-b border-border last:border-0"><span className="font-bold">{size}</span><span>{bust}</span><span>{waist}</span><span>{hip}</span></div>)}
+                         <div className="grid grid-cols-4 pb-2 text-[10px] tracking-widest uppercase text-muted-foreground"><span>Size</span><span>Bust / chest</span><span>Waist</span><span>Hip</span></div>
+                       </div>
+                       <p className="text-xs text-muted-foreground leading-relaxed">Measurements are a general guide and may vary by designer, fabric, and cut. Please contact the atelier for piece-specific advice.</p>
+                     </DialogContent>
+                   </Dialog>
                 </div>
                 <div className="grid grid-cols-4 gap-3">
                   {product.sizes?.map(size => (
@@ -186,6 +223,24 @@ export default function ProductDetail() {
                   ))}
                 </div>
               </div>
+            )}
+
+            {hasSizes && (
+              <section className="mb-10 border border-border p-5" aria-labelledby="fit-predictor-title" data-testid="fit-predictor">
+                <div className="flex items-start justify-between gap-4 mb-5">
+                  <div>
+                    <p id="fit-predictor-title" className="text-xs font-bold tracking-widest uppercase mb-1">Lightweight fit predictor</p>
+                    <p className="text-xs text-muted-foreground">A local guide based on your usual size and preference.</p>
+                  </div>
+                  {fitRecommendation && <span className="text-primary text-sm font-bold" data-testid="fit-recommendation">Recommended: {fitRecommendation}</span>}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div><Label htmlFor="fit-height" className="text-xs text-muted-foreground">Height (cm)</Label><Input id="fit-height" data-testid="input-fit-height" value={height} onChange={(e) => setHeight(e.target.value)} inputMode="numeric" placeholder="170" className="rounded-none mt-2" /></div>
+                  <div><Label htmlFor="fit-size" className="text-xs text-muted-foreground">Usual size</Label><select id="fit-size" data-testid="select-fit-size" value={usualSize} onChange={(e) => setUsualSize(e.target.value)} className="w-full h-10 mt-2 border border-input px-3 text-sm bg-background"><option value="">Select</option>{product.sizes?.map((size) => <option key={size} value={size}>{size}</option>)}</select></div>
+                  <div><Label htmlFor="fit-preference" className="text-xs text-muted-foreground">Preferred fit</Label><select id="fit-preference" data-testid="select-fit-preference" value={fitPreference} onChange={(e) => setFitPreference(e.target.value)} className="w-full h-10 mt-2 border border-input px-3 text-sm bg-background"><option value="close">Close</option><option value="regular">Regular</option><option value="relaxed">Relaxed</option></select></div>
+                </div>
+                {/* Future enhancement: AI style-matching could account for garment-specific proportions. */}
+              </section>
             )}
 
             {/* Actions */}

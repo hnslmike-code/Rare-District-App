@@ -7,12 +7,7 @@ import { ArrowRight, Package } from "lucide-react";
 
 export default function Orders() {
   const [, setLocation] = useLocation();
-  const { data: ordersData, isLoading } = useListOrders({
-    query: {
-      queryKey: ["orders", 1], // For now just page 1
-    },
-    limit: 50
-  });
+  const { data: ordersData, isLoading } = useListOrders({ limit: 50 });
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -37,7 +32,7 @@ export default function Orders() {
             <Skeleton key={i} className="w-full h-32 bg-secondary/50 rounded-none" />
           ))}
         </div>
-      ) : !ordersData?.items || ordersData.items.length === 0 ? (
+      ) : !ordersData || ordersData.length === 0 ? (
         <div className="py-24 text-center border border-border bg-secondary/10">
           <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
           <h2 className="font-serif text-2xl font-bold mb-4">No order history found.</h2>
@@ -48,7 +43,7 @@ export default function Orders() {
         </div>
       ) : (
         <div className="space-y-6">
-          {ordersData.items.map((order) => (
+          {ordersData.map((order) => (
             <div key={order.id} className="border border-border bg-background p-6 hover:border-foreground/50 transition-colors">
               <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between mb-6 border-b border-border pb-6">
                 <div>

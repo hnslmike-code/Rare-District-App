@@ -36,6 +36,7 @@ export default function VendorApply() {
 
   const { data: profile, isLoading } = useGetMyVendorProfile({
     query: {
+      queryKey: ["/api/vendors/me"],
       retry: false
     }
   });

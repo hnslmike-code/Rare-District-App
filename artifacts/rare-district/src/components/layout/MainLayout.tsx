@@ -81,9 +81,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20">
+    <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20 nebula-surface">
       {/* ── Top Header ── */}
-      <header className="sticky top-0 z-50 w-full bg-background/95 backdrop-blur-md border-b border-border/50">
+      <header className="sticky top-0 z-50 w-full bg-background/75 backdrop-blur-xl border-b border-border/70">
         <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between gap-4">
           {/* Left: hamburger + logo */}
           <div className="flex items-center gap-4">
@@ -96,7 +96,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             </button>
             <Link
               href="/"
-              className="font-serif text-2xl md:text-3xl font-bold tracking-widest uppercase text-foreground hover:text-primary transition-colors"
+              className="font-serif text-2xl md:text-3xl font-bold tracking-[0.18em] uppercase text-foreground hover:text-primary transition-colors"
+              data-testid="link-brand"
             >
               Rare District
             </Link>
@@ -122,9 +123,10 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           {/* Right: actions */}
           <div className="flex items-center gap-4 md:gap-5">
             {/* Search */}
-            <button
+             <button
               className="text-foreground hover:text-primary transition-colors"
-              aria-label="Search"
+               aria-label="Search"
+               data-testid="button-open-search"
               onClick={() => setSearchOpen(true)}
             >
               <Search className="w-5 h-5" strokeWidth={1.5} />
@@ -136,7 +138,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 <Link
                   href="/wardrobe"
                   className="relative text-foreground hover:text-primary transition-colors"
-                  aria-label="Wardrobe"
+                   aria-label="Wardrobe"
+                   data-testid="link-wardrobe"
                 >
                   <ShoppingBag className="w-5 h-5" strokeWidth={1.5} />
                   {wardrobeCount > 0 && (
@@ -158,7 +161,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                   </button>
 
                   {userMenuOpen && (
-                    <div className="absolute right-0 top-full mt-3 w-52 bg-background border border-border shadow-xl z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                     <div className="absolute right-0 top-full mt-3 w-52 glass-panel z-50 animate-in fade-in slide-in-from-top-2 duration-150">
                       <div className="px-4 py-3 border-b border-border">
                         <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Signed in as</p>
                         <p className="text-sm font-medium truncate">{currentUser?.name || currentUser?.email}</p>
@@ -211,8 +214,8 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
       {/* ── Search Overlay ── */}
       {searchOpen && (
-        <div
-          className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-md flex flex-col items-center justify-center px-6 animate-in fade-in duration-200"
+          <div
+            className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-xl starfield flex flex-col items-center justify-center px-6 animate-in fade-in duration-200"
           onClick={(e) => { if (e.target === e.currentTarget) setSearchOpen(false); }}
         >
           <button
@@ -223,14 +226,15 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             <X className="w-7 h-7" />
           </button>
           <p className="text-xs uppercase tracking-[0.3em] text-muted-foreground mb-8">Search the District</p>
-          <form onSubmit={handleSearch} className="w-full max-w-xl">
+           <form onSubmit={handleSearch} className="w-full max-w-xl" data-testid="form-search">
             <div className="relative">
               <input
                 ref={searchInputRef}
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products, designers…"
+                 placeholder="Search products, designers…"
+                 data-testid="input-search"
                 className="w-full bg-transparent border-0 border-b-2 border-foreground/30 focus:border-foreground outline-none font-serif text-3xl md:text-4xl py-3 pr-12 placeholder:text-muted-foreground/40 text-foreground transition-colors"
               />
               <button type="submit" className="absolute right-0 top-1/2 -translate-y-1/2 text-foreground hover:text-primary transition-colors">
@@ -250,7 +254,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileMenuOpen(false)}
           />
           {/* Drawer */}
-          <div className="fixed top-0 left-0 h-full w-[280px] bg-background z-[60] flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
+             <div className="fixed top-0 left-0 h-full w-[280px] bg-background/95 backdrop-blur-xl z-[60] flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
             <div className="flex items-center justify-between px-6 h-20 border-b border-border">
               <span className="font-serif text-lg font-bold tracking-widest uppercase">Menu</span>
               <button onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">
@@ -335,7 +339,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1">{children}</main>
 
       {/* ── Footer ── */}
-      <footer className="bg-foreground text-background py-16 md:py-24 mt-auto">
+      <footer className="bg-[hsl(229_25%_5%)] text-foreground py-16 md:py-24 mt-auto border-t border-border/70">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">

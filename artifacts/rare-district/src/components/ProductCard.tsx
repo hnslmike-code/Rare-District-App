@@ -53,19 +53,19 @@ export function ProductCard({ product }: ProductCardProps) {
 
   const imageUrl = product.images && product.images.length > 0
     ? `/api/storage/objects/${product.images[0]}`
-    : `https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400&h=533&auto=format&fit=crop&q=80`;
+    : undefined;
 
   return (
     <Link href={`/product/${product.id}`} data-testid={`product-card-${product.id}`}>
       <article className="group block cursor-pointer">
         {/* Image */}
-        <div className="relative overflow-hidden bg-secondary aspect-[3/4] mb-4">
-          <img
+        <div className="relative overflow-hidden bg-secondary aspect-[3/4] mb-4 luxury-image">
+          {imageUrl ? <img
             src={imageUrl}
             alt={product.name}
             className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
             loading="lazy"
-          />
+          /> : <div className="absolute inset-0 starfield flex items-center justify-center"><span className="font-serif text-3xl text-primary/60">RD</span></div>}
           {/* Add to Wardrobe overlay */}
           <button
             onClick={handleAdd}

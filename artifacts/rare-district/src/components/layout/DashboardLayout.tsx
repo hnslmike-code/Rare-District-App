@@ -57,9 +57,9 @@ export function DashboardLayout({
   };
 
   const SidebarContent = () => (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full nebula-surface">
       {/* Logo */}
-      <div className="p-6 border-b border-border flex items-center justify-between">
+      <div className="p-6 border-b border-border/70 flex items-center justify-between">
         <Link
           href="/"
           className="font-serif text-xl font-bold tracking-widest uppercase text-foreground hover:text-primary transition-colors flex items-center gap-2"
@@ -90,11 +90,12 @@ export function DashboardLayout({
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileSidebarOpen(false)}
-                className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors ${
+               className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-l-2 ${
                   active
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "text-foreground hover:bg-secondary hover:text-foreground"
+                     ? "bg-primary/12 text-primary border-primary"
+                     : "text-foreground border-transparent hover:bg-secondary hover:text-primary"
                 }`}
+                data-testid={`link-dashboard-${link.label.toLowerCase().replace(/\s+/g, "-")}`}
               >
                 <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={active ? 2 : 1.5} />
                 {link.label}
@@ -127,9 +128,9 @@ export function DashboardLayout({
   );
 
   return (
-    <div className="min-h-[100dvh] flex bg-muted/30">
+    <div className="min-h-[100dvh] flex bg-background">
       {/* ── Desktop Sidebar ── */}
-      <aside className="w-64 bg-background border-r border-border hidden md:flex flex-col sticky top-0 h-[100dvh]">
+       <aside className="w-64 bg-[hsl(229_25%_6%)] border-r border-border/70 hidden md:flex flex-col sticky top-0 h-[100dvh]">
         <SidebarContent />
       </aside>
 
@@ -149,7 +150,7 @@ export function DashboardLayout({
       {/* ── Main Content ── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top bar */}
-        <div className="md:hidden flex items-center gap-4 px-4 h-16 bg-background border-b border-border sticky top-0 z-30">
+         <div className="md:hidden flex items-center gap-4 px-4 h-16 bg-background/90 backdrop-blur-xl border-b border-border sticky top-0 z-30">
           <button
             onClick={() => setMobileSidebarOpen(true)}
             className="text-foreground hover:text-primary transition-colors"

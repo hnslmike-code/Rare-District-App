@@ -64,11 +64,11 @@ export default function Login() {
   return (
     <div className="min-h-[80vh] flex flex-col md:flex-row bg-background">
       {/* Visual side */}
-      <div className="hidden md:flex w-1/2 bg-foreground relative overflow-hidden">
+      <div className="hidden md:flex w-1/2 bg-[hsl(229_25%_5%)] relative overflow-hidden starfield nebula-surface">
         <img 
           src="https://images.unsplash.com/photo-1490481651871-ab68de25d43d?q=80&w=2000&auto=format&fit=crop" 
           alt="Fashion Detail" 
-          className="absolute inset-0 w-full h-full object-cover opacity-60 mix-blend-overlay grayscale-[30%]"
+           className="absolute inset-0 w-full h-full object-cover opacity-35 mix-blend-luminosity grayscale-[30%]"
         />
         <div className="relative z-10 p-16 flex flex-col justify-end text-background w-full">
           <h2 className="font-serif text-5xl font-bold tracking-tight mb-6">Welcome Back.</h2>
@@ -80,7 +80,7 @@ export default function Login() {
       
       {/* Form side */}
       <div className="w-full md:w-1/2 flex items-center justify-center p-8 md:p-16">
-        <div className="w-full max-w-md">
+         <div className="w-full max-w-md glass-panel p-7 md:p-10">
           <div className="mb-10 text-center md:text-left">
             <h1 className="font-serif text-3xl md:text-4xl font-bold tracking-tight mb-2">Sign In</h1>
             <p className="text-muted-foreground">Enter your credentials to continue.</p>
@@ -111,7 +111,7 @@ export default function Login() {
                       <Link href="/forgot-password" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">Forgot?</Link>
                     </div>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} className="h-12 rounded-none border-border focus-visible:ring-primary focus-visible:border-primary bg-transparent" />
+                       <Input type="password" placeholder="Enter your password" {...field} className="h-12 rounded-none border-border focus-visible:ring-primary focus-visible:border-primary bg-transparent" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

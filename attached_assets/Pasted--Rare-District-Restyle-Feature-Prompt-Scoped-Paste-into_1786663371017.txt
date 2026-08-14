@@ -1,0 +1,52 @@
+# Rare District — Restyle + Feature Prompt (Scoped)
+
+Paste into Replit's Agent on the existing Rare District project (github.com/hnslmike-code/Rare-District-App).
+
+---
+
+## PROMPT START
+
+You're working on my existing marketplace app **Rare District**. The core framework (auth, listings, basic flows) already exists — do NOT rebuild it from scratch. Do two things in this pass: (1) restyle the entire UI, and (2) add the specific features listed below. Do not build anything outside this scope.
+
+### 1. Restyle Pass — "Luxury Space" aesthetic
+Apply across every existing page and component (nav, product cards, product detail, cart/wardrobe, checkout, auth pages, vendor dashboard, admin dashboard):
+
+- **Palette**: deep space-black / near-black charcoal base (#0a0a0f–#111116), soft off-white text, metallic gold or chrome-silver accents for CTAs, prices, and highlights. Faint indigo/violet nebula-glow used sparingly in gradients and hover states — no neon, no gamer-RGB.
+- **Background**: an animated starfield/particle background (subtle drifting particles, low density, low opacity — should read as ambient, not distracting) on hero sections and empty states. Use a lightweight canvas/CSS particle effect, not a heavy 3D library, to keep performance solid on mobile.
+- **Typography**: elegant serif for headlines, clean geometric sans-serif for body/UI, light-on-dark throughout.
+- **Materials**: glassmorphism panels (frosted, semi-transparent, subtle border) for nav, cards, and modals; soft glow on hover instead of flat drop shadows; slow-easing transitions — premium, not bouncy.
+- **Photography**: full-bleed product images that "float" against the dark background, gallery-lit rather than bright-studio-lit.
+- Restyle existing components in place — keep their current functionality intact. Verify text contrast stays accessible against the dark background.
+
+### 2. Features to Add (this pass only)
+
+**Discovery & merchandising**
+- Homepage sections: "New Arrivals," "Trending Now," "Curated Edits" (admin-curated collections)
+- Lookbook / editorial pages per brand (multi-image storytelling, not just a grid)
+- Size guide + fit-predictor per product
+- (Skip AI style-matching for now — flag it as a future enhancement in code comments, don't build it)
+
+**Vendor tools**
+- Vendor analytics dashboard: views, conversion rate, top sellers, revenue trend chart
+- Bulk product upload via CSV
+- Drop scheduling — vendors can schedule a listing to go live at a future date/time
+- Low-stock and out-of-stock auto-alerts
+
+**Growth & retention**
+- Loyalty points system: points earned per purchase, redeemable for discounts, layered on top of the existing coupon/referral system
+- Abandoned-cart email/SMS nudges
+- "Flash drop" countdown timers for limited releases
+- Notifications for restocks and price drops on wishlisted items
+
+### 3. Explicitly Out of Scope for This Pass
+Do not build: public shareable closet/profile pages, follow-brand social features, reviews with photo upload, returns/dispute flow, verified-vendor badges, fraud flags, AR try-on, live shopping, or raffle/waitlist systems. If any of these would require a data-model change that's cheap to make now to avoid rework later, note it in a comment — but don't build the feature itself.
+
+### 4. Build Order
+1. Restyle pass across all existing pages
+2. Discovery & merchandising features
+3. Vendor tools
+4. Growth & retention features
+
+Confirm each stage works before moving to the next rather than doing all four in parallel.
+
+## PROMPT END

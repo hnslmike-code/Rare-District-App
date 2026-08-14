@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useListAdminVendors, useUpdateVendorStatus, getListAdminVendorsQueryKey } from "@workspace/api-client-react";
+import { useListAdminVendors, useUpdateVendorStatus, getListAdminVendorsQueryKey, type ListAdminVendorsStatus, type VendorStatusUpdateStatus } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function AdminVendors() {
-  const [filter, setFilter] = useState<string>("all");
+  const [filter, setFilter] = useState<"all" | ListAdminVendorsStatus>("all");
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -35,7 +35,7 @@ export default function AdminVendors() {
     }
   });
 
-  const handleStatusChange = (vendorId: number, status: string) => {
+  const handleStatusChange = (vendorId: number, status: VendorStatusUpdateStatus) => {
     updateStatus.mutate({ id: vendorId, data: { status } });
   };
 
@@ -46,7 +46,7 @@ export default function AdminVendors() {
           <h1 className="font-serif text-4xl font-bold tracking-tight mb-2">Vendor Applications</h1>
           <p className="text-muted-foreground">Review and approve atelier applications.</p>
         </div>
-        <Select value={filter} onValueChange={setFilter}>
+        <Select value={filter} onValueChange={(value) => setFilter(value as "all" | ListAdminVendorsStatus)}>
           <SelectTrigger className="w-40 rounded-none">
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
