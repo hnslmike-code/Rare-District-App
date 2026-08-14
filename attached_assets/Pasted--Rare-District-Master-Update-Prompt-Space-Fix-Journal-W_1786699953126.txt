@@ -1,0 +1,48 @@
+# Rare District — Master Update Prompt (Space Fix + Journal + WhatsApp + Seeds)
+
+Paste into Replit's Agent on the existing Rare District project (github.com/hnslmike-code/Rare-District-App). Core framework already exists — do not rebuild existing functionality, only add/fix what's below.
+
+---
+
+## PROMPT START
+
+You're working on my existing marketplace app **Rare District**. Implement the following in order. Confirm each section works before moving to the next.
+
+### 1. Fix the Space Aesthetic
+The current styling reads as dark editorial, not "space." Fix:
+- Remove any literal hero photo overlay — hero is fully abstract/graphic: layered soft-blurred gradient orbs (violet/indigo, hint of gold), animated starfield canvas behind everything (varying particle size/opacity, slow drift, some gentle twinkle), headline/CTA floating on top. Real product photos only appear in the product grid below the hero, gallery-lit and floating against black.
+- Animated gradient orbs: 2–3 large soft radial gradients slowly drifting/breathing (10–20s loop) behind hero content.
+- True glassmorphism on nav, cards, modals: actual `backdrop-filter: blur()`, semi-transparent background, soft 1px border — verify it's really applied, not a flat solid panel.
+- Gold/chrome woven throughout (card borders on hover, icon strokes, dividers, price text, button gradients), not isolated to two elements.
+- Keep the existing serif display type and luxury minimalism.
+
+### 2. Interactivity
+- Cursor-following glow trail (soft radial glow, violet or gold, low opacity, blurred, throttled/rAF-based) across hero and product grid.
+- 3D tilt on product cards on hover (perspective transform toward cursor position, a few degrees max, shadow/glow shifts with it).
+- Scroll-triggered reveal animations, staggered (cards/text stagger by a few ms each, not all at once). Apply site-wide on marketing/browsing pages (homepage, product listings, product detail, journal). Keep animation light or absent on admin and vendor dashboard pages — those are functional tools, not marketing surfaces.
+- Smooth, slow-easing transitions site-wide on buttons, nav, cards.
+
+### 3. Editorial Journal — "The Vanguard"
+- New section/route for editorial content: style stories, brand spotlights, drop behind-the-scenes.
+- Both admin and approved vendors can write posts. Vendor-submitted posts go into a `pending` status and require admin approval before publishing; admin posts publish directly.
+- Posts support **shoppable product tags**: inline tags/markers on images or text that link to and preview an actual product (click opens product card/quick-view). Tags reference real product IDs from the catalog.
+- Journal listing page + individual post pages, styled consistently with the rest of the site (glass cards, serif headlines, staggered reveal on scroll).
+
+### 4. WhatsApp Integration (Meta Cloud API)
+- Integrate Meta's official WhatsApp Cloud API (not Twilio).
+- **Opt-in flow**: add a WhatsApp number field + consent checkbox at signup (optional/skippable there). If skipped, prompt for it again at checkout before order confirmation. Store the WhatsApp number and a consent boolean on the user record. Every WhatsApp message type below must check consent before sending.
+- **Order confirmation**: send a WhatsApp message when an order is successfully placed, to consenting users only.
+- **Abandoned-cart nudge**: a background job that finds carts inactive for 1 hour and sends a WhatsApp nudge to consenting users only, with a message containing a tokenized checkout link that reopens their cart pre-filled at checkout — not the homepage.
+- **Click-to-WhatsApp support button**: a persistent button (site-wide, e.g. bottom-right) that opens a WhatsApp chat with the store's support number, pre-filled with a generic "Hi, I need help with..." message. This one doesn't require the Cloud API — it's a simple `wa.me` link.
+
+### 5. Seed Test Accounts
+Create/extend a database seed script that creates:
+- 1 admin account (role `admin`, active)
+- 2 vendor accounts (role `vendor`, status `approved`, each with a sample brand name and 2–3 sample products)
+- 2 shopper accounts (role `shopper`, active)
+All five share the same test password `RareDistrict2026!` (flag as test-only in a code comment). Log all five emails + the shared password to the console when the seed script runs.
+
+### 6. Explicitly Out of Scope for This Pass
+Do not touch: checkout/payment logic itself, vendor analytics tools, discovery/merchandising features beyond the journal, loyalty/points system, drop scheduling, or CSV bulk upload. This pass is strictly: space aesthetic fix, the three interactivity additions, the journal section, WhatsApp integration as scoped, and seed accounts.
+
+## PROMPT END
