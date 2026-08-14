@@ -2,19 +2,20 @@ import { Link } from "wouter";
 import { useGetStorefrontSummary, useListProducts } from "@workspace/api-client-react";
 import { ArrowRight } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Starfield } from "@/components/visuals/Starfield";
+import { ProductCard } from "@/components/ProductCard";
 
 export default function Home() {
   const { data: summary, isLoading } = useGetStorefrontSummary();
   const newest = useListProducts({ sortBy: "newest", limit: 4 }, { query: { queryKey: ["home-products", "newest"] } });
   const popular = useListProducts({ sortBy: "popular", limit: 4 }, { query: { queryKey: ["home-products", "popular"] } });
-  const productImage = (image?: string) => image ? (image.startsWith("http") || image.startsWith("/") ? image : `/api/storage/objects/${image}`) : undefined;
   const ProductRail = ({ title, products, loading, testId }: { title: string; products: any[]; loading: boolean; testId: string }) => (
     <section className="py-20 md:py-28 container mx-auto px-4 md:px-6" data-testid={testId}>
       <div className="flex items-end justify-between mb-12 gap-4">
         <div><p className="text-primary text-xs font-bold tracking-[0.28em] uppercase mb-3">The district edit</p><h2 className="font-serif text-4xl md:text-5xl font-bold tracking-tight">{title}</h2></div>
         <Link href="/shop" className="text-xs font-bold tracking-widest uppercase hover:text-primary transition-colors flex items-center gap-2">Shop all <ArrowRight className="w-4 h-4" /></Link>
       </div>
-      {loading ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[3/4]" />)}</div> : products.length ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-8">{products.map((product) => <Link key={product.id} href={`/product/${product.id}`} className="group" data-testid={`home-product-${product.id}`}><div className="aspect-[3/4] bg-secondary overflow-hidden mb-4">{productImage(product.images?.[0]) ? <img src={productImage(product.images?.[0])} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" /> : <div className="h-full flex items-center justify-center text-muted-foreground">No image</div>}</div><p className="text-[10px] font-bold tracking-widest uppercase text-muted-foreground">{product.vendor?.brandName || "Rare District"}</p><h3 className="font-serif text-lg mt-1 line-clamp-1">{product.name}</h3><p className="text-sm mt-1">{product.currency} {product.price.toLocaleString()}</p></Link>)}</div> : <div className="border border-border py-16 text-center text-muted-foreground" data-testid={`${testId}-empty`}>The edit is being assembled.</div>}
+      {loading ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[3/4]" />)}</div> : products.length ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-8">{products.map((product) => <ProductCard key={product.id} product={product} showWardrobe={false} dataTestId={`home-product-${product.id}`} />)}</div> : <div className="border border-border py-16 text-center text-muted-foreground" data-testid={`${testId}-empty`}>The edit is being assembled.</div>}
     </section>
   );
 
@@ -35,17 +36,21 @@ export default function Home() {
   return (
     <div className="animate-in fade-in duration-1000">
       {/* Hero Section */}
-      <section className="relative min-h-[80vh] flex items-center justify-center overflow-hidden bg-[hsl(229_25%_5%)] text-foreground starfield nebula-surface">
-        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center opacity-25 mix-blend-luminosity"></div>
-        <div className="relative z-10 text-center px-4 max-w-4xl mx-auto mt-20">
-           <p className="text-sm md:text-base tracking-[0.3em] uppercase mb-6 text-primary">Lagos / Global</p>
+      <section className="relative min-h-[80vh] flex items-center justify-center overflow-hidden bg-[hsl(229_25%_5%)] text-foreground hero-nebula nebula-surface">
+        <Starfield density="high" />
+        <div className="nebula-orb nebula-orb-gold" aria-hidden="true" />
+        <div className="nebula-orb nebula-orb-indigo" aria-hidden="true" />
+        <div className="nebula-orb nebula-orb-chrome" aria-hidden="true" />
+        <div className="hero-grid" aria-hidden="true" />
+        <div className="relative z-10 text-center px-5 max-w-4xl mx-auto mt-20 hero-panel">
+           <p className="text-sm md:text-base tracking-[0.3em] uppercase mb-6 text-primary">Lagos / Global · Private access</p>
            <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-medium tracking-tight mb-8 leading-[1.1]">
             Curated.<br/>Not Assembled.
           </h1>
            <p className="text-lg md:text-xl text-foreground/70 mb-10 max-w-xl mx-auto font-light">
             The private district for the discerning eye. Discover contemporary African luxury from elite vanguard designers.
           </p>
-           <Link href="/shop" className="inline-flex items-center justify-center bg-primary text-primary-foreground px-8 py-4 text-sm font-bold tracking-widest uppercase hover:bg-primary/85 transition-all duration-300 gap-3 group" data-testid="link-enter-district">
+            <Link href="/shop" className="inline-flex items-center justify-center chrome-button px-8 py-4 text-sm font-bold tracking-widest uppercase gap-3 group" data-testid="link-enter-district">
             Enter The District
             <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
@@ -67,23 +72,9 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-8">
           {summary?.featuredProducts?.slice(0, 4).map((product) => (
-            <Link key={product.id} href={`/product/${product.id}`} className="group block">
-              <div className="aspect-[3/4] overflow-hidden bg-secondary mb-6 relative">
-                {product.images?.[0] ? (
-                  <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-muted-foreground font-serif">No Image</div>
-                )}
-                {product.stock === 0 && (
-                  <div className="absolute top-4 left-4 bg-background px-3 py-1 text-xs font-bold tracking-widest uppercase">Sold Out</div>
-                )}
-              </div>
-              <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-2">{product.vendor?.brandName || "Rare District"}</p>
-              <h3 className="font-serif text-xl font-medium mb-2 group-hover:text-primary transition-colors">{product.name}</h3>
-              <p className="text-sm">{product.currency} {product.price.toLocaleString()}</p>
-            </Link>
+            <ProductCard key={product.id} product={product} showWardrobe={false} dataTestId={`home-featured-product-${product.id}`} />
           ))}
           {(!summary?.featuredProducts || summary.featuredProducts.length === 0) && (
             <div className="col-span-full py-12 text-center text-muted-foreground">
@@ -94,14 +85,11 @@ export default function Home() {
       </section>
 
       {/* Editorial Split Section */}
-      <section className="bg-[hsl(229_25%_5%)] text-foreground starfield">
+       <section className="bg-[hsl(229_25%_5%)] text-foreground starfield nebula-surface">
+         <Starfield density="medium" />
         <div className="grid grid-cols-1 lg:grid-cols-2">
           <div className="aspect-square lg:aspect-auto relative min-h-[50vh]">
-            <img 
-              src="https://images.unsplash.com/photo-1550614000-4b95d4ed7ed6?q=80&w=2000&auto=format&fit=crop" 
-              alt="Editorial Fashion" 
-              className="absolute inset-0 w-full h-full object-cover grayscale-[30%]"
-            />
+             <div className="absolute inset-0 editorial-nebula-art" role="img" aria-label="Abstract orbit artwork for the Rare District editorial" />
           </div>
           <div className="p-12 md:p-24 lg:p-32 flex flex-col justify-center">
             <h2 className="font-serif text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-8">Quiet Luxury.<br/>Loud Impact.</h2>

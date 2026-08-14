@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Search, ShoppingBag, User as UserIcon, Menu, X, ArrowRight } from "lucide-react";
 import { useGetWardrobe } from "@workspace/api-client-react";
+import { CursorGlow } from "@/components/visuals/CursorGlow";
 
 const NAV_LINKS = [
   { href: "/shop", label: "Shop" },
@@ -82,8 +83,9 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20 nebula-surface">
+      <CursorGlow />
       {/* ── Top Header ── */}
-      <header className="sticky top-0 z-50 w-full bg-background/75 backdrop-blur-xl border-b border-border/70">
+      <header className="sticky top-0 z-50 w-full glass-header">
         <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between gap-4">
           {/* Left: hamburger + logo */}
           <div className="flex items-center gap-4">
@@ -339,7 +341,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1">{children}</main>
 
       {/* ── Footer ── */}
-      <footer className="bg-[hsl(229_25%_5%)] text-foreground py-16 md:py-24 mt-auto border-t border-border/70">
+      <footer className="bg-[hsl(229_25%_5%)] text-foreground py-16 md:py-24 mt-auto border-t border-primary/25">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">

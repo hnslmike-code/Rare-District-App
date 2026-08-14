@@ -1,12 +1,111 @@
 import { db, usersTable, vendorsTable, productsTable, categoriesTable, adminSettingsTable, couponsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { hashPassword, generateReferralCode } from "./auth";
 import { logger } from "./logger";
+
+// TEST-ONLY credential. Change every seeded password before a real launch.
+const TEST_PASSWORD = "RareDistrict2026!";
+
+const TEST_ACCOUNTS = [
+  { email: "admin@raredistrict.com", name: "Rare District Admin", role: "admin" as const },
+  { email: "anika@luxurybyanika.com", name: "Anika Osei", role: "vendor" as const },
+  { email: "zara@zarastudiong.com", name: "Zara Adewale", role: "vendor" as const },
+  { email: "demo@shopper.com", name: "Demo Shopper", role: "shopper" as const },
+  { email: "shopper@raredistrict.com", name: "Rare District Shopper", role: "shopper" as const },
+];
+
+const VENDOR_DETAILS = [
+  {
+    email: "anika@luxurybyanika.com",
+    brandName: "Luxury by Anika",
+    description: "Handcrafted luxury womenswear with an Afrocentric aesthetic. Every piece tells a story of cultural pride and modern elegance.",
+  },
+  {
+    email: "zara@zarastudiong.com",
+    brandName: "Zara Studio NG",
+    description: "Contemporary Nigerian fashion bridging traditional craftsmanship with contemporary silhouettes. Known for our signature Adire prints.",
+  },
+];
+
+const VENDOR_PRODUCTS = [
+  [
+    { name: "Aso-Oke Wrap Gown", description: "Floor-length wrap gown in hand-woven aso-oke. Available in ivory, burnt orange, and deep teal. Perfect for owambe and formal events.", price: "85000", category: "occasion-wear", sizes: ["XS", "S", "M", "L", "XL"], stock: 12, isFeatured: true },
+    { name: "Adire Silk Blouse", description: "Tie-dyed silk blouse in our signature indigo pattern. Effortlessly transitions from day to evening.", price: "45000", category: "womenswear", sizes: ["XS", "S", "M", "L"], stock: 20, isFeatured: true },
+    { name: "Gold Embroidered Kaftan", description: "Luxe kaftan in ivory silk with hand-stitched gold embroidery at the neckline and hem. A statement piece.", price: "120000", category: "womenswear", sizes: ["S", "M", "L", "XL", "2XL"], stock: 8, isFeatured: false },
+  ],
+  [
+    { name: "Ankara Power Suit", description: "Bold Ankara print blazer and trousers set. Structured, powerful, unapologetically African.", price: "72000", category: "womenswear", sizes: ["XS", "S", "M", "L", "XL"], stock: 15, isFeatured: true },
+    { name: "Batik Slip Dress", description: "Minimal silhouette in hand-drawn batik cotton. The kind of dress you reach for repeatedly.", price: "38000", category: "womenswear", sizes: ["XS", "S", "M", "L"], stock: 25, isFeatured: false },
+    { name: "Adire Midi Skirt", description: "A-line midi skirt in our house adire pattern. Pairs with anything, goes everywhere.", price: "28000", category: "womenswear", sizes: ["XS", "S", "M", "L", "XL"], stock: 30, isFeatured: false },
+  ],
+] as const;
+
+async function ensureTestAccounts() {
+  const passwordHash = await hashPassword(TEST_PASSWORD);
+  const users = new Map<string, typeof usersTable.$inferSelect>();
+
+  for (const account of TEST_ACCOUNTS) {
+    const [existing] = await db.select().from(usersTable).where(eq(usersTable.email, account.email)).limit(1);
+    const [user] = existing
+      ? await db.update(usersTable).set({
+          name: account.name,
+          role: account.role,
+          passwordHash,
+        }).where(eq(usersTable.id, existing.id)).returning()
+      : await db.insert(usersTable).values({
+          email: account.email,
+          name: account.name,
+          passwordHash,
+          role: account.role,
+          referralCode: account.role === "admin" ? "ADMIN001" : generateReferralCode(),
+        }).returning();
+    users.set(account.email, user);
+  }
+
+  for (const [index, details] of VENDOR_DETAILS.entries()) {
+    const user = users.get(details.email);
+    if (!user) continue;
+
+    let [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, user.id)).limit(1);
+    if (!vendor) {
+      [vendor] = await db.insert(vendorsTable).values({
+        userId: user.id,
+        brandName: details.brandName,
+        description: details.description,
+        status: "approved",
+        bankName: "First Bank Nigeria",
+        accountNumber: `301234567${index}`,
+        accountName: user.name ?? user.email,
+      }).returning();
+    } else if (vendor.status !== "approved") {
+      [vendor] = await db.update(vendorsTable).set({ status: "approved" }).where(eq(vendorsTable.id, vendor.id)).returning();
+    }
+
+    const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(productsTable).where(eq(productsTable.vendorId, vendor.id));
+    if (Number(count) < 2) {
+      const existingProducts = await db.select({ name: productsTable.name }).from(productsTable).where(eq(productsTable.vendorId, vendor.id));
+      const existingNames = new Set(existingProducts.map((product) => product.name));
+      const missingProducts = VENDOR_PRODUCTS[index]
+        .filter((product) => !existingNames.has(product.name))
+        .slice(0, 3 - Number(count))
+        .map((product) => ({ ...product, vendorId: vendor.id, images: [] as string[] }));
+      if (missingProducts.length > 0) {
+        await db.insert(productsTable).values(missingProducts);
+      }
+    }
+  }
+
+  logger.info({
+    accounts: TEST_ACCOUNTS.map(({ email, role }) => ({ email, role })),
+    password: TEST_PASSWORD,
+  }, "Rare District test accounts ready (test-only credential)");
+}
 
 export async function seedDemoData() {
   // Check if already seeded
   const existing = await db.select().from(usersTable).limit(1);
   if (existing.length > 0) {
+    await ensureTestAccounts();
     logger.info("Demo data already seeded, skipping.");
     return;
   }
@@ -32,7 +131,7 @@ export async function seedDemoData() {
   const [adminUser] = await db.insert(usersTable).values({
     email: "admin@raredistrict.com",
     name: "Rare District Admin",
-    passwordHash: await hashPassword(process.env.ADMIN_SEED_PASSWORD ?? "change-me-on-first-boot"),
+    passwordHash: await hashPassword(TEST_PASSWORD),
     role: "admin",
     referralCode: "ADMIN001",
   }).returning();
@@ -42,43 +141,20 @@ export async function seedDemoData() {
     db.insert(usersTable).values({
       email: "anika@luxurybyanika.com",
       name: "Anika Osei",
-      passwordHash: await hashPassword(process.env.VENDOR_SEED_PASSWORD ?? "change-me-on-first-boot"),
+      passwordHash: await hashPassword(TEST_PASSWORD),
       role: "vendor",
       referralCode: generateReferralCode(),
     }).returning(),
     db.insert(usersTable).values({
       email: "zara@zarastudiong.com",
       name: "Zara Adewale",
-      passwordHash: await hashPassword(process.env.VENDOR_SEED_PASSWORD ?? "change-me-on-first-boot"),
-      role: "vendor",
-      referralCode: generateReferralCode(),
-    }).returning(),
-    db.insert(usersTable).values({
-      email: "kola@thekollection.ng",
-      name: "Kola Fashola",
-      passwordHash: await hashPassword(process.env.VENDOR_SEED_PASSWORD ?? "change-me-on-first-boot"),
+      passwordHash: await hashPassword(TEST_PASSWORD),
       role: "vendor",
       referralCode: generateReferralCode(),
     }).returning(),
   ]);
 
-  const vendorDetails = [
-    {
-      brandName: "Luxury by Anika",
-      description: "Handcrafted luxury womenswear with an Afrocentric aesthetic. Every piece tells a story of cultural pride and modern elegance.",
-      logoUrl: null,
-    },
-    {
-      brandName: "Zara Studio NG",
-      description: "Contemporary Nigerian fashion bridging traditional craftsmanship with contemporary silhouettes. Known for our signature Adire prints.",
-      logoUrl: null,
-    },
-    {
-      brandName: "The Kollection",
-      description: "Premium menswear and streetwear for the discerning Lagos gentleman. Quality fabrics, impeccable tailoring.",
-      logoUrl: null,
-    },
-  ];
+  const vendorDetails = VENDOR_DETAILS.map((details) => ({ ...details, logoUrl: null }));
 
   const vendors = await Promise.all(vendorUsers.map(async ([user], i) => {
     const [vendor] = await db.insert(vendorsTable).values({
@@ -104,10 +180,6 @@ export async function seedDemoData() {
     { vendorId: vendors[1].id, name: "Ankara Power Suit", description: "Bold Ankara print blazer and trousers set. Structured, powerful, unapologetically African.", price: "72000", category: "womenswear", sizes: ["XS","S","M","L","XL"], images: [], stock: 15, isFeatured: true },
     { vendorId: vendors[1].id, name: "Batik Slip Dress", description: "Minimal silhouette in hand-drawn batik cotton. The kind of dress you reach for repeatedly.", price: "38000", category: "womenswear", sizes: ["XS","S","M","L"], images: [], stock: 25, isFeatured: false },
     { vendorId: vendors[1].id, name: "Adire Midi Skirt", description: "A-line midi skirt in our house adire pattern. Pairs with anything, goes everywhere.", price: "28000", category: "womenswear", sizes: ["XS","S","M","L","XL"], images: [], stock: 30, isFeatured: false },
-    // The Kollection (vendor 2)
-    { vendorId: vendors[2].id, name: "Lagos Agbada Set", description: "Three-piece agbada ensemble in imported brocade. Tailored in Lagos, respected everywhere.", price: "95000", category: "menswear", sizes: ["M","L","XL","2XL","3XL"], images: [], stock: 10, isFeatured: true },
-    { vendorId: vendors[2].id, name: "Streetwear Ankara Joggers", description: "Premium Ankara-print joggers with a clean silhouette. Heritage meets street culture.", price: "32000", category: "streetwear", sizes: ["S","M","L","XL","2XL"], images: [], stock: 22, isFeatured: false },
-    { vendorId: vendors[2].id, name: "Tailored Senegalese Trousers", description: "Wide-leg Senegalese cotton trousers. Breathable, elegant, and distinctly West African.", price: "55000", category: "menswear", sizes: ["S","M","L","XL","2XL"], images: [], stock: 18, isFeatured: false },
   ];
 
   await db.insert(productsTable).values(productData);
@@ -117,10 +189,18 @@ export async function seedDemoData() {
   const [shopper] = await db.insert(usersTable).values({
     email: "demo@shopper.com",
     name: "Demo Shopper",
-    passwordHash: await hashPassword(process.env.VENDOR_SEED_PASSWORD ?? "change-me-on-first-boot"),
+    passwordHash: await hashPassword(TEST_PASSWORD),
     role: "shopper",
     referralCode: generateReferralCode(),
   }).returning();
+
+  await db.insert(usersTable).values({
+    email: "shopper@raredistrict.com",
+    name: "Rare District Shopper",
+    passwordHash: await hashPassword(TEST_PASSWORD),
+    role: "shopper",
+    referralCode: generateReferralCode(),
+  });
 
   // Welcome coupon
   await db.insert(couponsTable).values({
@@ -145,4 +225,8 @@ export async function seedDemoData() {
   });
 
   logger.info("Seeding complete. Initial accounts created — change passwords before going live.");
+  logger.info({
+    accounts: TEST_ACCOUNTS.map(({ email, role }) => ({ email, role })),
+    password: TEST_PASSWORD,
+  }, "Rare District test accounts ready (test-only credential)");
 }

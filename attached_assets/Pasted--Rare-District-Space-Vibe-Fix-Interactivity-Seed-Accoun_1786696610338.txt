@@ -1,0 +1,38 @@
+# Rare District — Space-Vibe Fix + Interactivity + Seed Accounts
+
+Paste into Replit's Agent on the existing Rare District project (github.com/hnslmike-code/Rare-District-App).
+
+---
+
+## PROMPT START
+
+You're working on my existing marketplace app **Rare District**. The current styling reads as dark editorial, not "space" — fix that specifically, add real interactivity, and seed test accounts. Don't rebuild existing functionality, only touch what's described below.
+
+### 1. Fix the Space Aesthetic (this is the priority — the last attempt missed it)
+The problem: flat dark background + a dot-grid texture + a desaturated photo overlay reads as "moody," not "space." Fix with:
+
+- **Remove the literal hero photo overlay entirely.** Replace the hero with a fully abstract/graphic treatment — no photo of a person. Use layered gradient orbs (deep violet/indigo, soft-edged, blurred), a starfield canvas behind everything, and the headline/CTA floating on top of that. Product photography should only appear below the hero, in the product grid, gallery-lit and floating against black.
+- **Real animated starfield**, not a static dot-grid: small particles of varying size and opacity, drifting slowly (canvas or lightweight WebGL — no heavy 3D library). Some particles should softly twinkle (opacity pulsing), not just sit static.
+- **Animated gradient orbs**: 2–3 large, soft-blurred radial gradients (violet/indigo and a hint of gold) positioned behind hero content, slowly drifting/breathing in place (subtle scale/position animation on a 10–20s loop). This is what gives the "nebula" depth the last version was missing.
+- **True glassmorphism, not flat panels**: the nav bar, product cards, and modals need actual `backdrop-filter: blur()`, semi-transparent background, and a soft 1px border — verify this is actually applied, the last pass used flat solid-color panels.
+- **Gold and chrome should appear consistently**, not just on isolated text: card borders on hover, icon strokes, dividers, price text, button gradients — gold/chrome should feel woven through the UI, not sprinkled in two spots.
+- Keep the serif display type and overall luxury minimalism — that part was working. The fix is atmosphere and depth, not typography.
+
+### 2. Interactivity to Add
+- **Cursor-following glow trail**: a soft radial glow (violet or gold, low opacity, blurred) that follows the user's cursor across the hero and product grid, giving a sense of light interacting with the space background. Should be subtle and performant (throttle/rAF-based, not laggy).
+- **3D tilt on product cards**: on hover, product cards should tilt slightly toward the cursor position (perspective transform, e.g. via a lightweight vanilla-JS tilt effect), with the glow/shadow shifting accordingly. Keep the tilt subtle (a few degrees max) — premium, not gimmicky.
+- **Animated gradient orbs** (as described above) count as part of the interactive/atmospheric layer — make sure they're genuinely animated, not static images.
+- Apply smooth, slow-easing transitions site-wide (nav, buttons, cards) — nothing should snap instantly.
+
+### 3. Seed Test Accounts
+Create a database seed script (or extend the existing one) that creates:
+- **1 admin account** — role `admin`, already approved/active
+- **2 vendor accounts** — role `vendor`, status `approved` (so they can list immediately for testing), each with a sample brand name and 2–3 sample products already listed
+- **2 shopper accounts** — role `shopper`, active
+
+All five accounts should share the same test password (use a clearly-labeled placeholder like `RareDistrict2026!` in the seed script — flag it in a code comment as a test-only credential to change before real launch). Print or log all five emails + the shared password to the console when the seed script runs, so I can copy them straight from the Replit console.
+
+### 4. Explicitly Out of Scope for This Pass
+Do not touch: vendor tools, discovery/merchandising features, growth/retention features, checkout logic, or payment integration. This pass is strictly: (1) fix the space aesthetic, (2) add the three interactive effects listed, (3) seed test accounts.
+
+## PROMPT END
