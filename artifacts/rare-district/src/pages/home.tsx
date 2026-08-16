@@ -43,6 +43,11 @@ export default function Home() {
         <div className="nebula-orb nebula-orb-chrome" aria-hidden="true" />
         <div className="hero-grid" aria-hidden="true" />
         <div className="relative z-10 text-center px-5 max-w-4xl mx-auto mt-20 hero-panel">
+           <img
+             src="/brand/rd-mark.png"
+             alt="Rare District symbol"
+             className="hero-brand-mark mx-auto mb-7"
+           />
            <p className="text-sm md:text-base tracking-[0.3em] uppercase mb-6 text-primary">Lagos / Global · Private access</p>
            <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-medium tracking-tight mb-8 leading-[1.1]">
             Curated.<br/>Not Assembled.

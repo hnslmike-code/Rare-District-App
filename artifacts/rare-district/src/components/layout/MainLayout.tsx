@@ -88,20 +88,29 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-50 w-full glass-header">
         <div className="container mx-auto px-4 md:px-6 h-20 flex items-center justify-between gap-4">
           {/* Left: hamburger + logo */}
-          <div className="flex items-center gap-4">
+          <div className="flex min-w-0 items-center gap-3 md:gap-4">
             <button
-              className="md:hidden text-foreground hover:text-primary transition-colors p-1"
+              className="md:hidden shrink-0 rounded-sm p-2 text-foreground hover:bg-foreground/5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 transition-colors"
               aria-label="Open menu"
+              data-testid="button-open-menu"
               onClick={() => setMobileMenuOpen(true)}
             >
               <Menu className="w-6 h-6" />
             </button>
             <Link
               href="/"
-              className="font-serif text-2xl md:text-3xl font-bold tracking-[0.18em] uppercase text-foreground hover:text-primary transition-colors"
+              aria-label="Rare District home"
+              className="group flex min-w-0 items-center gap-2.5 text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               data-testid="link-brand"
             >
-              Rare District
+              <img
+                src="/brand/rd-mark.png"
+                alt="Rare District symbol"
+                className="rd-header-mark shrink-0"
+              />
+              <span className="hidden truncate font-serif text-xl font-bold uppercase tracking-[0.16em] md:inline md:text-2xl md:tracking-[0.18em]">
+                Rare District
+              </span>
             </Link>
           </div>
 
@@ -257,9 +266,21 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           />
           {/* Drawer */}
              <div className="fixed top-0 left-0 h-full w-[280px] bg-background/95 backdrop-blur-xl z-[60] flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
-            <div className="flex items-center justify-between px-6 h-20 border-b border-border">
-              <span className="font-serif text-lg font-bold tracking-widest uppercase">Menu</span>
-              <button onClick={() => setMobileMenuOpen(false)} aria-label="Close menu">
+             <div className="flex h-20 items-center justify-between border-b border-border px-6">
+               <Link
+                 href="/"
+                 className="flex items-center gap-2.5 text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+                 data-testid="link-mobile-brand"
+               >
+                 <img src="/brand/rd-mark.png" alt="Rare District symbol" className="rd-mobile-mark" />
+                 <span className="font-serif text-base font-bold uppercase tracking-[0.16em]">Rare District</span>
+               </Link>
+               <button
+                 onClick={() => setMobileMenuOpen(false)}
+                 aria-label="Close menu"
+                 data-testid="button-close-menu"
+                 className="rounded-sm p-2 text-foreground transition-colors hover:bg-foreground/5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
+               >
                 <X className="w-6 h-6" />
               </button>
             </div>
@@ -341,11 +362,15 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1">{children}</main>
 
       {/* ── Footer ── */}
-      <footer className="bg-[hsl(229_25%_5%)] text-foreground py-16 md:py-24 mt-auto border-t border-primary/25">
+       <footer className="rd-footer mt-auto border-t border-primary/25 bg-[hsl(229_25%_5%)] py-16 text-foreground md:py-24">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">
-              <h2 className="font-serif text-3xl font-bold tracking-widest uppercase mb-6">Rare District</h2>
+               <img
+                 src="/brand/rd-footer-lockup.png"
+                 alt="Rare District — Built Different. Made Rare. Lagos, worldwide."
+                 className="rd-footer-lockup mb-7"
+               />
               <p className="text-muted text-sm max-w-sm leading-relaxed">
                 Curating the absolute vanguard of contemporary Nigerian fashion. A private district for the discerning eye.
               </p>

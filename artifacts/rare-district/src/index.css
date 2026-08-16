@@ -131,6 +131,11 @@ button, a, input, select, textarea { transition: color .45s cubic-bezier(.22,1,.
 .nebula-orb-indigo { width:34rem; height:28rem; right:-10rem; top:-6rem; background: radial-gradient(circle, hsl(251 57% 56% / .42), transparent 68%); animation-duration: 23s; animation-delay:-8s; }
 .nebula-orb-chrome { width:20rem; height:18rem; right:24%; bottom:-9rem; background: radial-gradient(circle, hsl(197 50% 67% / .25), transparent 68%); animation-duration: 20s; animation-delay:-4s; }
 .glass-header { background: hsl(var(--background) / .62); border-bottom: 1px solid hsl(var(--primary) / .25); backdrop-filter: blur(22px) saturate(130%); -webkit-backdrop-filter: blur(22px) saturate(130%); }
+.rd-header-mark { width: 2.1rem; height: 2.1rem; object-fit: contain; object-position: center; image-rendering: auto; filter: drop-shadow(0 0 0.65rem hsl(41 30% 85% / .12)); transition: transform .55s cubic-bezier(.22,1,.36,1), filter .55s cubic-bezier(.22,1,.36,1); }
+.group:hover .rd-header-mark, .group:focus-visible .rd-header-mark { transform: rotate(-7deg) scale(1.06); filter: drop-shadow(0 0 0.9rem hsl(41 30% 85% / .26)); }
+.rd-mobile-mark { width: 1.75rem; height: 1.75rem; object-fit: contain; object-position: center; image-rendering: auto; }
+.rd-footer-lockup { display: block; width: min(100%, 27rem); height: auto; max-height: 10rem; object-fit: contain; object-position: left center; filter: drop-shadow(0 0 .8rem hsl(41 22% 84% / .08)); }
+.hero-brand-mark { width: 4.25rem; height: 4.25rem; object-fit: contain; object-position: center; opacity: .94; filter: drop-shadow(0 0 1.2rem hsl(41 30% 85% / .16)); animation: mark-arrive .9s cubic-bezier(.22,1,.36,1) both; }
 .chrome-button { color: hsl(var(--primary-foreground)); background: linear-gradient(110deg, hsl(41 65% 64%), hsl(40 45% 50%) 54%, hsl(197 17% 74%)); border: 1px solid hsl(42 65% 77% / .7); box-shadow: 0 12px 34px hsl(41 60% 40% / .22), inset 0 1px hsl(var(--foreground) / .6); }
 .chrome-button:hover { transform: translateY(-2px); box-shadow: 0 16px 40px hsl(41 60% 40% / .3), inset 0 1px hsl(var(--foreground) / .8); }
 .glass-action { background: hsl(228 25% 8% / .64); border: 1px solid hsl(var(--primary) / .6); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: 0 8px 24px hsl(228 30% 2% / .3), inset 0 1px hsl(var(--foreground) / .13); }
@@ -147,9 +152,20 @@ button.bg-primary, a.bg-primary { box-shadow: 0 8px 24px hsl(var(--primary) / .1
   0% { transform: translate3d(-1rem, 1rem, 0) scale(1); }
   100% { transform: translate3d(2rem, -1.5rem, 0) scale(1.08); }
 }
+@keyframes mark-arrive {
+  from { opacity: 0; transform: translateY(.7rem) scale(.9) rotate(-10deg); }
+  to { opacity: .94; transform: translateY(0) scale(1) rotate(0); }
+}
 
 @media (min-width: 768px) {
   .hero-panel { padding: 3.5rem 4rem; }
+}
+
+@media (max-width: 380px) {
+  .rd-header-mark { width: 1.8rem; height: 1.8rem; }
+  .rd-header-mark + span { font-size: 1.05rem; letter-spacing: .12em; }
+  .rd-mobile-mark { width: 1.55rem; height: 1.55rem; }
+  .rd-footer-lockup { width: min(100%, 18rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {
