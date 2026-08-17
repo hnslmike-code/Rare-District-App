@@ -1,0 +1,51 @@
+# Rare District — Add: Bottom Nav Bar + Slide-Out Sidebar Menu
+
+Paste into Replit's Agent on the existing Rare District project. This is an ADDITION ONLY — do not modify, restyle, or touch any existing page, component, or feature beyond wiring these two new elements in.
+
+---
+
+## PROMPT START
+
+Add a bottom navigation bar and a slide-out sidebar menu to Rare District, styled to match the existing "Luxury Space" design system (dark near-black base, glassmorphism, gold/chrome accents, glow on active/hover states). Do not change anything else on the site — this is purely additive.
+
+### 1. Bottom Navigation Bar (mobile)
+A fixed bottom nav bar, visible on mobile widths, with 5 items:
+- **Shop** — home/house icon, links to the homepage
+- **Wardrobe** — Wardrobe icon, links to the user's saved/wardrobe items
+- **Showroom** — door icon, opens the editorial/ journal
+- **Vendor Hub** — tag icon, links to the vendor dashboard (if the logged-in user is a vendor) or to "Become a Vendor" signup (if they're a shopper)
+- **Me** — person icon, links to account/profile
+
+Style: glass panel (frosted, semi-transparent, subtle border), fixed to the bottom of the viewport, active item highlighted with a gold glow/underline, icons in chrome/off-white with the active icon in gold. Smooth transition when switching active state.
+
+### 2. Slide-Out Sidebar Menu
+Triggered by the hamburger icon in the header if that fits the existing layout better — use your judgement on trigger placement
+
+**Top action**
+- "Sell With Us" — turn items into a vendor listing (equivalent to "Sell to us" in the reference), links to vendor onboarding/showroom flow
+
+**Shopping section**
+- New In (with a live count badge, e.g. "X this week", pulled from actual recent-listing data)
+- Price Drops (live count badge from actual discounted items)
+- Men's
+- Women's
+- Brands
+
+**Selling section**
+- How To Sell? (vendor FAQ/help page)
+- Vendor Hub (matches the bottom nav item — use the same label here for consistency, don't call it "Selling Hub" in one place and "Vendor Hub" in another)
+
+**Account section**
+- Wardrobe/Favourites
+- Me / Account settings
+
+Style: same glass/dark treatment as the rest of the site, gold accent on the count badges, smooth slide-in/out animation, close via an X button or tapping outside the panel.
+
+### 3. Constraints
+- Do not restyle, refactor, or alter any existing page, route, or component other than adding these two new UI pieces and wiring their links to already-existing pages/routes.
+- If a linked destination doesn't exist yet (e.g. no dedicated "Price Drops" page), create a minimal placeholder page rather than skipping the link, and note in a code comment that it needs real content later.
+- Ensure the bottom nav doesn't overlap or conflict with any existing fixed elements (e.g. the WhatsApp support button, if already added) — position them so both are visible and usable together.
+
+## PROMPT END
+
+

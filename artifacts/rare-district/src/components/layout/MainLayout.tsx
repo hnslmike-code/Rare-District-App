@@ -1,9 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Search, ShoppingBag, User as UserIcon, Menu, X, ArrowRight } from "lucide-react";
 import { useGetWardrobe } from "@workspace/api-client-react";
 import { CursorGlow } from "@/components/visuals/CursorGlow";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { DistrictSidebar } from "@/components/layout/DistrictSidebar";
 
 const NAV_LINKS = [
   { href: "/shop", label: "Shop" },
@@ -21,6 +23,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
 
   const { data: wardrobe } = useGetWardrobe({
     query: {
@@ -82,7 +85,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20 nebula-surface">
+    <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20 nebula-surface pb-24 md:pb-0">
       <CursorGlow />
       {/* ── Top Header ── */}
       <header className="sticky top-0 z-50 w-full glass-header">
@@ -257,107 +260,16 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* ── Mobile Menu ── */}
-      {mobileMenuOpen && (
-        <>
-          {/* Backdrop */}
-          <div
-            className="fixed inset-0 z-[55] bg-foreground/50 backdrop-blur-sm animate-in fade-in duration-200"
-            onClick={() => setMobileMenuOpen(false)}
-          />
-          {/* Drawer */}
-             <div className="fixed top-0 left-0 h-full w-[280px] bg-background/95 backdrop-blur-xl z-[60] flex flex-col shadow-2xl animate-in slide-in-from-left duration-300">
-             <div className="flex h-20 items-center justify-between border-b border-border px-6">
-               <Link
-                 href="/"
-                 className="flex items-center gap-2.5 text-foreground transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-                 data-testid="link-mobile-brand"
-               >
-                 <img src="/brand/rd-mark.png" alt="Rare District symbol" className="rd-mobile-mark" />
-                 <span className="font-serif text-base font-bold uppercase tracking-[0.16em]">Rare District</span>
-               </Link>
-               <button
-                 onClick={() => setMobileMenuOpen(false)}
-                 aria-label="Close menu"
-                 data-testid="button-close-menu"
-                 className="rounded-sm p-2 text-foreground transition-colors hover:bg-foreground/5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70"
-               >
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-
-            <nav className="flex-1 px-6 py-8 space-y-1 overflow-y-auto">
-              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mb-4">Shop</p>
-              {NAV_LINKS.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors"
-                >
-                  {link.label}
-                  <ArrowRight className="w-4 h-4 opacity-30" />
-                </Link>
-              ))}
-
-              {isAuthenticated && (
-                <>
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mt-8 mb-4">Account</p>
-                  <Link href="/orders" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
-                    My Orders <ArrowRight className="w-4 h-4 opacity-30" />
-                  </Link>
-                  <Link href="/wardrobe" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
-                    My Wardrobe <ArrowRight className="w-4 h-4 opacity-30" />
-                  </Link>
-                  <Link href="/rewards" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
-                    My Rewards <ArrowRight className="w-4 h-4 opacity-30" />
-                  </Link>
-                  {currentUser?.role === "vendor" && (
-                    <Link href="/vendor-dashboard" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
-                      Vendor Dashboard <ArrowRight className="w-4 h-4 opacity-30" />
-                    </Link>
-                  )}
-                  {currentUser?.role === "admin" && (
-                    <Link href="/admin" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-primary border-b border-border/40 transition-colors">
-                      Admin Panel <ArrowRight className="w-4 h-4 opacity-50" />
-                    </Link>
-                  )}
-                </>
-              )}
-
-              {!isAuthenticated && (
-                <>
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground mt-8 mb-4">Account</p>
-                  <Link href="/login" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
-                    Sign In <ArrowRight className="w-4 h-4 opacity-30" />
-                  </Link>
-                  <Link href="/register" className="flex items-center justify-between py-3 text-base font-medium uppercase tracking-widest text-foreground hover:text-primary border-b border-border/40 transition-colors">
-                    Register <ArrowRight className="w-4 h-4 opacity-30" />
-                  </Link>
-                </>
-              )}
-            </nav>
-
-            {isAuthenticated && (
-              <div className="px-6 py-6 border-t border-border">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-9 h-9 bg-secondary flex items-center justify-center font-serif text-base flex-shrink-0">
-                    {currentUser?.name?.charAt(0) || currentUser?.email?.charAt(0)}
-                  </div>
-                  <div className="overflow-hidden">
-                    <p className="text-sm font-medium truncate">{currentUser?.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{currentUser?.email}</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { logout(); setLocation("/"); setMobileMenuOpen(false); }}
-                  className="w-full text-left text-sm text-destructive hover:text-destructive/80 font-medium transition-colors uppercase tracking-widest"
-                >
-                  Sign Out
-                </button>
-              </div>
-            )}
-          </div>
-        </>
-      )}
+      <DistrictSidebar
+        open={mobileMenuOpen}
+        onClose={closeMobileMenu}
+        isAuthenticated={isAuthenticated}
+        isVendor={currentUser?.role === "vendor"}
+        isAdmin={currentUser?.role === "admin"}
+        currentUserName={currentUser?.name}
+        currentUserEmail={currentUser?.email}
+        onSignOut={() => { logout(); setLocation("/"); closeMobileMenu(); }}
+      />
 
       <main className="flex-1">{children}</main>
 
@@ -404,6 +316,11 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       </footer>
+       <BottomNav
+         isAuthenticated={isAuthenticated}
+         isVendor={currentUser?.role === "vendor"}
+         wardrobeCount={wardrobeCount}
+       />
     </div>
   );
 }

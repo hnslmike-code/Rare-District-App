@@ -135,6 +135,10 @@ button, a, input, select, textarea { transition: color .45s cubic-bezier(.22,1,.
 .group:hover .rd-header-mark, .group:focus-visible .rd-header-mark { transform: rotate(-7deg) scale(1.06); filter: drop-shadow(0 0 0.9rem hsl(41 30% 85% / .26)); }
 .rd-mobile-mark { width: 1.75rem; height: 1.75rem; object-fit: contain; object-position: center; image-rendering: auto; }
 .rd-footer-lockup { display: block; width: min(100%, 27rem); height: auto; max-height: 10rem; object-fit: contain; object-position: left center; filter: drop-shadow(0 0 .8rem hsl(41 22% 84% / .08)); }
+@media (max-width: 767px) {
+  .rd-footer-lockup { width: min(100%, 15rem); max-height: 8rem; }
+  .rd-footer { padding-bottom: 8rem; }
+}
 .hero-brand-mark { width: 4.25rem; height: 4.25rem; object-fit: contain; object-position: center; opacity: .94; filter: drop-shadow(0 0 1.2rem hsl(41 30% 85% / .16)); animation: mark-arrive .9s cubic-bezier(.22,1,.36,1) both; }
 .chrome-button { color: hsl(var(--primary-foreground)); background: linear-gradient(110deg, hsl(41 65% 64%), hsl(40 45% 50%) 54%, hsl(197 17% 74%)); border: 1px solid hsl(42 65% 77% / .7); box-shadow: 0 12px 34px hsl(41 60% 40% / .22), inset 0 1px hsl(var(--foreground) / .6); }
 .chrome-button:hover { transform: translateY(-2px); box-shadow: 0 16px 40px hsl(41 60% 40% / .3), inset 0 1px hsl(var(--foreground) / .8); }
@@ -165,7 +169,7 @@ button.bg-primary, a.bg-primary { box-shadow: 0 8px 24px hsl(var(--primary) / .1
   .rd-header-mark { width: 1.8rem; height: 1.8rem; }
   .rd-header-mark + span { font-size: 1.05rem; letter-spacing: .12em; }
   .rd-mobile-mark { width: 1.55rem; height: 1.55rem; }
-  .rd-footer-lockup { width: min(100%, 18rem); }
+  .rd-footer-lockup { width: min(100%, 14rem); }
 }
 
 @media (prefers-reduced-motion: reduce) {

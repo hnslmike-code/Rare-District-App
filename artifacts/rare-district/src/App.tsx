@@ -23,6 +23,9 @@ import Register from '@/pages/register';
 import Orders from '@/pages/orders';
 import OrderDetail from '@/pages/order-detail';
 import Rewards from '@/pages/rewards';
+import Account from '@/pages/account';
+import HowToSell from '@/pages/how-to-sell';
+import PriceDrops from '@/pages/price-drops';
 
 // Vendor Dashboard
 import VendorDashboard from '@/pages/vendor-dashboard/index';
@@ -122,6 +125,9 @@ function Router() {
       <Route path="/lookbook/:id" component={() => <PublicRoute component={Lookbook} />} />
       <Route path="/login" component={() => <PublicRoute component={Login} />} />
       <Route path="/register" component={() => <PublicRoute component={Register} />} />
+      <Route path="/account" component={() => <PublicRoute component={Account} />} />
+      <Route path="/how-to-sell" component={() => <PublicRoute component={HowToSell} />} />
+      <Route path="/price-drops" component={() => <PublicRoute component={PriceDrops} />} />
 
       {/* Protected Shopper */}
       <Route path="/wardrobe" component={() => <ProtectedRoute component={Wardrobe} />} />
