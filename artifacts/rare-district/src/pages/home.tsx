@@ -155,7 +155,7 @@ function LayeredCarousel({ entries, onQuickAdd }: { entries: CarouselEntry[]; on
           const product = entry.product;
           const isActive = offset === 0;
           return (
-            <article key={`${entry.kind}-${product.id}-${offset}`} className={`layered-slide ${isActive ? "is-active" : offset < 0 ? "is-prev" : "is-next"}`} style={{ "--drag-offset": `${dragOffset}px` } as CSSProperties}>
+            <article key={`${entry.kind}-${product.id}`} className={`layered-slide ${isActive ? "is-active" : offset < 0 ? "is-prev" : "is-next"}`} style={{ "--drag-offset": `${dragOffset}px` } as CSSProperties}>
               <Link href={entry.kind === "collection" ? `/shop?category=${entry.category}` : `/product/${product.id}`} className="block h-full" tabIndex={isActive ? 0 : -1}>
                 <div className="layered-slide-image">
                   {imageUrl(product) ? <img src={imageUrl(product)} alt={entry.kind === "collection" ? entry.title : product.name} draggable={false} /> : <ProductPlaceholder product={product} collection={entry.kind === "collection"} />}
