@@ -1,142 +1,214 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "wouter";
-import { useGetStorefrontSummary, useListProducts } from "@workspace/api-client-react";
-import { ArrowRight } from "lucide-react";
+import { useAddToWardrobe, useGetStorefrontSummary, useListProducts } from "@workspace/api-client-react";
+import { ArrowLeft, ArrowRight, Pause, Play, ShoppingBag, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Starfield } from "@/components/visuals/Starfield";
 import { ProductCard } from "@/components/ProductCard";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+
+type Product = {
+  id: number;
+  vendorId: number;
+  name: string;
+  price: number;
+  currency?: string;
+  images?: string[];
+  stock?: number;
+  sizes?: string[];
+  category?: string | null;
+  vendor?: { id: number; brandName: string };
+};
+
+type CarouselEntry =
+  | { kind: "product"; product: Product }
+  | { kind: "collection"; product: Product; title: string; category: string };
+
+function imageUrl(product?: Product) {
+  const image = product?.images?.[0];
+  if (!image) return undefined;
+  return image.startsWith("http") || image.startsWith("/") ? image : `/api/storage/objects/${image}`;
+}
+
+function money(product: Product) {
+  return `${product.currency || "₦"} ${product.price.toLocaleString()}`;
+}
+
+function ProductPlaceholder({ product, collection = false }: { product: Product; collection?: boolean }) {
+  return (
+    <div className={`product-placeholder ${collection ? "is-collection" : ""}`}>
+      <span className="product-placeholder-index">{collection ? "EDIT" : `0${(product.id % 9) + 1}`}</span>
+      <strong>{collection ? `${product.category || "The"} edit` : product.name}</strong>
+      <span>{product.vendor?.brandName || "Rare District"}</span>
+    </div>
+  );
+}
+
+function QuickAddDrawer({ product, onClose }: { product: Product | null; onClose: () => void }) {
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [size, setSize] = useState(product?.sizes?.[0] || "");
+  const addToWardrobe = useAddToWardrobe({
+    mutation: {
+      onSuccess: () => {
+        toast({ title: "Added to wardrobe", description: product?.name });
+        onClose();
+      },
+      onError: () => toast({ title: "Unable to add this piece", description: "Please sign in and try again.", variant: "destructive" }),
+    },
+  });
+
+  useEffect(() => setSize(product?.sizes?.[0] || ""), [product]);
+  if (!product) return null;
+
+  const add = () => {
+    if (!isAuthenticated) {
+      toast({ title: "Sign in to save this piece", description: "Your wardrobe is ready when you are." });
+      return;
+    }
+    addToWardrobe.mutate({ data: { productId: product.id, quantity: 1 } });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex justify-end" role="dialog" aria-modal="true" aria-label={`Quick add ${product.name}`}>
+      <button className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} aria-label="Close quick add" />
+      <aside className="relative z-10 flex h-full w-full max-w-md flex-col bg-background p-6 shadow-2xl sm:p-8">
+        <div className="flex items-center justify-between border-b border-border pb-5">
+          <div>
+            <p className="eyebrow">Quick add</p>
+            <h2 className="mt-2 font-serif text-2xl">{product.name}</h2>
+          </div>
+          <button onClick={onClose} className="rounded-full border border-border p-2 hover:bg-secondary" aria-label="Close quick add"><X className="h-5 w-5" /></button>
+        </div>
+        <div className="mt-8 overflow-hidden rounded-[2rem] bg-secondary">
+          {imageUrl(product) ? <img src={imageUrl(product)} alt={product.name} className="aspect-[4/5] w-full object-cover" /> : <div className="aspect-[4/5] flex items-center justify-center font-serif text-4xl text-muted-foreground">RD</div>}
+        </div>
+        <div className="mt-6 flex items-center justify-between">
+          <p className="text-sm uppercase tracking-[0.18em] text-muted-foreground">{product.vendor?.brandName || "Rare District"}</p>
+          <p className="font-serif text-xl">{money(product)}</p>
+        </div>
+        {product.sizes?.length ? (
+          <div className="mt-7">
+            <div className="mb-3 flex justify-between text-xs font-semibold uppercase tracking-[0.18em]"><span>Select size</span><span className="text-muted-foreground">Required</span></div>
+            <div className="grid grid-cols-4 gap-2">
+              {product.sizes.map((option) => <button key={option} onClick={() => setSize(option)} className={`border px-3 py-3 text-sm transition ${size === option ? "border-foreground bg-foreground text-background" : "border-border hover:border-foreground"}`}>{option}</button>)}
+            </div>
+          </div>
+        ) : null}
+        <div className="mt-auto space-y-3 border-t border-border pt-6">
+          <button onClick={add} disabled={addToWardrobe.isPending || (!!product.sizes?.length && !size)} className="flex w-full items-center justify-center gap-3 bg-foreground px-5 py-4 text-xs font-bold uppercase tracking-[0.2em] text-background transition hover:bg-muted-foreground disabled:cursor-not-allowed disabled:opacity-50">
+            <ShoppingBag className="h-4 w-4" /> {addToWardrobe.isPending ? "Adding…" : "Add to wardrobe"}
+          </button>
+          <Link href={`/product/${product.id}`} onClick={onClose} className="block w-full border border-border px-5 py-4 text-center text-xs font-bold uppercase tracking-[0.2em] hover:bg-secondary">View full details</Link>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function LayeredCarousel({ entries, onQuickAdd }: { entries: CarouselEntry[]; onQuickAdd: (product: Product) => void }) {
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [dragStart, setDragStart] = useState<number | null>(null);
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const count = entries.length;
+  const safeIndex = count ? active % count : 0;
+
+  useEffect(() => {
+    if (paused || prefersReducedMotion || count < 2) return;
+    const timer = window.setInterval(() => setActive((current) => current + 1), 5200);
+    return () => window.clearInterval(timer);
+  }, [paused, prefersReducedMotion, count]);
+
+  const go = (delta: number) => setActive((current) => (current + delta + count) % count);
+  const getEntry = (offset: number) => entries[(safeIndex + offset + count) % count];
+  if (!count) return <div className="border border-border py-24 text-center text-muted-foreground">The edit is being assembled.</div>;
+
+  return (
+    <div className="layered-carousel" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
+      <div className="layered-carousel-stage" onPointerDown={(event) => { setDragStart(event.clientX); event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={(event) => { if (dragStart !== null && Math.abs(event.clientX - dragStart) > 45) go(event.clientX < dragStart ? 1 : -1); setDragStart(null); }} onKeyDown={(event) => { if (event.key === "ArrowRight") go(1); if (event.key === "ArrowLeft") go(-1); }} tabIndex={0} aria-label="Featured product carousel">
+        {[-1, 0, 1].map((offset) => {
+          const entry = getEntry(offset);
+          const product = entry.product;
+          const isActive = offset === 0;
+          return (
+            <article key={`${entry.kind}-${product.id}-${offset}`} className={`layered-slide ${isActive ? "is-active" : offset < 0 ? "is-prev" : "is-next"}`}>
+              <Link href={entry.kind === "collection" ? `/shop?category=${entry.category}` : `/product/${product.id}`} className="block h-full" tabIndex={isActive ? 0 : -1}>
+                <div className="layered-slide-image">
+                  {imageUrl(product) ? <img src={imageUrl(product)} alt={entry.kind === "collection" ? entry.title : product.name} draggable={false} /> : <ProductPlaceholder product={product} collection={entry.kind === "collection"} />}
+                </div>
+                {isActive && <div className="layered-slide-copy"><p className="eyebrow">{product.vendor?.brandName || "Rare District edit"}</p><h3>{entry.kind === "collection" ? entry.title : product.name}</h3><p className="layered-slide-price">{entry.kind === "collection" ? "Browse the edit" : money(product)}</p></div>}
+              </Link>
+              {isActive && entry.kind === "product" && <button onClick={() => onQuickAdd(product)} className="layered-quick-add"><ShoppingBag className="h-4 w-4" /> Quick add</button>}
+            </article>
+          );
+        })}
+      </div>
+      <div className="mt-8 flex items-center justify-center gap-5">
+        <button onClick={() => go(-1)} className="carousel-control" aria-label="Previous featured item"><ArrowLeft className="h-4 w-4" /></button>
+        <div className="flex items-center gap-2" aria-label={`${safeIndex + 1} of ${count}`}>
+          {entries.slice(0, Math.min(count, 6)).map((entry, index) => <button key={`${entry.kind}-${entry.product.id}`} aria-label={`Go to item ${index + 1}`} onClick={() => setActive(index)} className={`carousel-dot ${index === safeIndex ? "is-active" : ""}`} />)}
+        </div>
+        <button onClick={() => go(1)} className="carousel-control" aria-label="Next featured item"><ArrowRight className="h-4 w-4" /></button>
+        <button onClick={() => setPaused((value) => !value)} className="carousel-play" aria-label={paused ? "Play carousel" : "Pause carousel"}>{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>
+      </div>
+      <p className="mt-4 text-center text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Swipe to explore · {safeIndex + 1} / {count}</p>
+    </div>
+  );
+}
 
 export default function Home() {
   const { data: summary, isLoading } = useGetStorefrontSummary();
-  const newest = useListProducts({ sortBy: "newest", limit: 4 }, { query: { queryKey: ["home-products", "newest"] } });
+  const newest = useListProducts({ sortBy: "newest", limit: 8 }, { query: { queryKey: ["home-products", "newest"] } });
   const popular = useListProducts({ sortBy: "popular", limit: 4 }, { query: { queryKey: ["home-products", "popular"] } });
-  const ProductRail = ({ title, products, loading, testId }: { title: string; products: any[]; loading: boolean; testId: string }) => (
-    <section className="py-20 md:py-28 container mx-auto px-4 md:px-6" data-testid={testId}>
-      <div className="flex items-end justify-between mb-12 gap-4">
-        <div><p className="text-primary text-xs font-bold tracking-[0.28em] uppercase mb-3">The district edit</p><h2 className="font-serif text-4xl md:text-5xl font-bold tracking-tight">{title}</h2></div>
-        <Link href="/shop" className="text-xs font-bold tracking-widest uppercase hover:text-primary transition-colors flex items-center gap-2">Shop all <ArrowRight className="w-4 h-4" /></Link>
-      </div>
-      {loading ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="aspect-[3/4]" />)}</div> : products.length ? <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 md:gap-8">{products.map((product) => <ProductCard key={product.id} product={product} showWardrobe={false} dataTestId={`home-product-${product.id}`} />)}</div> : <div className="border border-border py-16 text-center text-muted-foreground" data-testid={`${testId}-empty`}>The edit is being assembled.</div>}
-    </section>
-  );
+  const [quickAdd, setQuickAdd] = useState<Product | null>(null);
+  const products = (newest.data?.items || []) as Product[];
+  const edit = useMemo<CarouselEntry[]>(() => {
+    const source = products.slice(0, 6);
+    return source.flatMap((product, index) => {
+      const entries: CarouselEntry[] = [{ kind: "product", product }];
+      if (index === 1 || index === 3) {
+        const category = product.category || "new arrivals";
+        entries.push({ kind: "collection", product, category, title: `${category.replace(/-/g, " ")} / the edit` });
+      }
+      return entries;
+    });
+  }, [products]);
+  const featured = (summary?.featuredProducts || []) as Product[];
 
-  if (isLoading) {
-    return (
-      <div className="animate-in fade-in duration-1000">
-        <div className="h-[70vh] bg-secondary/50 starfield flex items-center justify-center">
-          <Skeleton className="w-1/2 h-20 bg-background/20" />
-        </div>
-        <div className="container mx-auto px-4 py-20 space-y-20">
-          <Skeleton className="w-full h-64" />
-          <Skeleton className="w-full h-64" />
-        </div>
-      </div>
-    );
-  }
+  if (isLoading) return <div className="container mx-auto space-y-12 px-4 py-16"><Skeleton className="h-[70vh] w-full" /><Skeleton className="h-64 w-full" /></div>;
 
   return (
-    <div className="animate-in fade-in duration-1000">
-      {/* Hero Section */}
-      <section className="relative min-h-[80vh] flex items-center justify-center overflow-hidden bg-[hsl(229_25%_5%)] text-foreground hero-nebula nebula-surface">
-        <Starfield density="high" />
-        <div className="nebula-orb nebula-orb-gold" aria-hidden="true" />
-        <div className="nebula-orb nebula-orb-indigo" aria-hidden="true" />
-        <div className="nebula-orb nebula-orb-chrome" aria-hidden="true" />
-        <div className="hero-grid" aria-hidden="true" />
-        <div className="relative z-10 text-center px-5 max-w-4xl mx-auto mt-20 hero-panel">
-           <img
-             src="/brand/rd-mark.png"
-             alt="Rare District symbol"
-             className="hero-brand-mark mx-auto mb-7"
-           />
-           <p className="text-sm md:text-base tracking-[0.3em] uppercase mb-6 text-primary">Lagos / Global · Private access</p>
-           <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl font-medium tracking-tight mb-8 leading-[1.1]">
-            Curated.<br/>Not Assembled.
-          </h1>
-           <p className="text-lg md:text-xl text-foreground/70 mb-10 max-w-xl mx-auto font-light">
-            The private district for the discerning eye. Discover contemporary African luxury from elite vanguard designers.
-          </p>
-            <Link href="/shop" className="inline-flex items-center justify-center chrome-button px-8 py-4 text-sm font-bold tracking-widest uppercase gap-3 group" data-testid="link-enter-district">
-            Enter The District
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </Link>
+    <div className="home-page">
+      <section className="rd-hero">
+        <div className="rd-hero-copy">
+          <p className="eyebrow">Lagos / Global · Private access</p>
+          <h1>Curated.<br /><em>Not assembled.</em></h1>
+          <p className="rd-hero-description">Contemporary African fashion, selected with intention and delivered from the designers shaping what comes next.</p>
+          <Link href="/shop" className="rd-primary-button" data-testid="link-enter-district">Enter the district <ArrowRight className="h-4 w-4" /></Link>
+        </div>
+        <div className="rd-hero-stamp"><img src="/brand/rd-mark.png" alt="" /><span>Built different<br />Made rare</span></div>
+      </section>
+
+      <section className="carousel-section" data-testid="section-featured-carousel">
+        <div className="container mx-auto px-4 md:px-6">
+          <div className="section-heading"><div><p className="eyebrow">The district edit / 01</p><h2>Pieces with presence.</h2></div><Link href="/shop" className="text-xs font-bold uppercase tracking-[0.2em] hover:underline">Shop all <ArrowRight className="ml-2 inline h-3.5 w-3.5" /></Link></div>
+          <LayeredCarousel entries={edit} onQuickAdd={setQuickAdd} />
         </div>
       </section>
 
-      <ProductRail title="New Arrivals" products={newest.data?.items ?? []} loading={newest.isLoading} testId="section-new-arrivals" />
-      <ProductRail title="Trending Now" products={popular.data?.items ?? []} loading={popular.isLoading} testId="section-trending-now" />
-
-      {/* Featured Products */}
-      <section className="py-24 md:py-32 container mx-auto px-4 md:px-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
-          <div>
-            <h2 className="font-serif text-4xl md:text-5xl font-bold tracking-tight mb-4">The Vanguard</h2>
-            <p className="text-muted-foreground text-lg max-w-md">Featured pieces from our most coveted designers.</p>
-          </div>
-          <Link href="/shop" className="text-sm font-bold tracking-widest uppercase hover:text-primary transition-colors flex items-center gap-2 group">
-            Shop All <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-5 md:gap-8">
-          {summary?.featuredProducts?.slice(0, 4).map((product) => (
-            <ProductCard key={product.id} product={product} showWardrobe={false} dataTestId={`home-featured-product-${product.id}`} />
-          ))}
-          {(!summary?.featuredProducts || summary.featuredProducts.length === 0) && (
-            <div className="col-span-full py-12 text-center text-muted-foreground">
-              <p>No featured products available at the moment.</p>
-            </div>
-          )}
-        </div>
+      <section className="container mx-auto px-4 py-20 md:px-6 md:py-28">
+        <div className="section-heading"><div><p className="eyebrow">The latest arrivals</p><h2>New in the district.</h2></div><Link href="/shop?category=new" className="text-xs font-bold uppercase tracking-[0.2em] hover:underline">Explore new <ArrowRight className="ml-2 inline h-3.5 w-3.5" /></Link></div>
+        {newest.isLoading ? <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="aspect-[3/4]" />)}</div> : <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">{products.slice(0, 4).map((product) => <ProductCard key={product.id} product={product} showWardrobe={false} dataTestId={`home-product-${product.id}`} />)}</div>}
       </section>
 
-      {/* Editorial Split Section */}
-       <section className="bg-[hsl(229_25%_5%)] text-foreground starfield nebula-surface">
-         <Starfield density="medium" />
-        <div className="grid grid-cols-1 lg:grid-cols-2">
-          <div className="aspect-square lg:aspect-auto relative min-h-[50vh]">
-             <div className="absolute inset-0 editorial-nebula-art" role="img" aria-label="Abstract orbit artwork for the Rare District editorial" />
-          </div>
-          <div className="p-12 md:p-24 lg:p-32 flex flex-col justify-center">
-            <h2 className="font-serif text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-8">Quiet Luxury.<br/>Loud Impact.</h2>
-             <p className="text-lg text-foreground/70 mb-12 max-w-md leading-relaxed font-light">
-              We don't chase trends. We define the standard. Every piece in our district is vetted for material excellence, conceptual brilliance, and impeccable execution.
-            </p>
-            <Link href="/shop?category=editorial" className="self-start border-b border-background pb-1 text-sm font-bold tracking-widest uppercase hover:text-primary hover:border-primary transition-colors">
-              Read The Editorial
-            </Link>
-          </div>
-        </div>
-      </section>
+      <section className="editorial-band"><div className="container mx-auto grid items-center gap-10 px-4 py-20 md:px-6 md:py-28 lg:grid-cols-[1.1fr_.9fr]"><div><p className="eyebrow">The house edit</p><h2>Find the brand<br /><em>before the trend.</em></h2></div><div><p className="max-w-md text-lg leading-relaxed text-muted-foreground">Rare District brings the ateliers, cult labels, and emerging voices of contemporary African fashion into one considered marketplace.</p><Link href="/shop?category=designers" className="mt-8 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] hover:underline">Meet the designers <ArrowRight className="h-4 w-4" /></Link></div></div></section>
 
-      {/* Featured Vendors */}
-      <section className="py-24 md:py-32 container mx-auto px-4 md:px-6">
-        <h2 className="font-serif text-3xl md:text-4xl font-bold tracking-tight text-center mb-16">The Ateliers</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-          {summary?.featuredVendors?.slice(0, 3).map((vendor) => (
-            <div key={vendor.id} className="group text-center" data-testid={`home-vendor-${vendor.id}`}>
-              <Link href={`/vendor/${vendor.id}`} className="block">
-              <div className="w-32 h-32 mx-auto rounded-full overflow-hidden bg-secondary mb-6 relative">
-                {vendor.logoUrl ? (
-                  <img src={vendor.logoUrl} alt={vendor.brandName} className="w-full h-full object-cover object-center group-hover:scale-110 transition-transform duration-500" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-2xl font-serif text-muted-foreground bg-primary/10">
-                    {vendor.brandName.charAt(0)}
-                  </div>
-                )}
-              </div>
-              <h3 className="font-serif text-2xl font-medium mb-3 group-hover:text-primary transition-colors">{vendor.brandName}</h3>
-              <p className="text-sm text-muted-foreground max-w-xs mx-auto line-clamp-2">{vendor.description || "Discover the collection."}</p>
-              </Link>
-              <Link href={`/lookbook/${vendor.id}`} className="inline-flex items-center gap-2 text-xs font-bold tracking-widest uppercase text-primary mt-5 hover:text-foreground" data-testid={`link-home-vendor-lookbook-${vendor.id}`}>Open lookbook <ArrowRight className="w-3.5 h-3.5" /></Link>
-            </div>
-          ))}
-          {(!summary?.featuredVendors || summary.featuredVendors.length === 0) && (
-            <div className="col-span-full py-12 text-center text-muted-foreground">
-              <p>The ateliers are preparing their showrooms.</p>
-            </div>
-          )}
-        </div>
+      <section className="container mx-auto px-4 py-20 md:px-6 md:py-28">
+        <div className="section-heading"><div><p className="eyebrow">The ateliers</p><h2>Start with a name.</h2></div><Link href="/shop?category=designers" className="text-xs font-bold uppercase tracking-[0.2em] hover:underline">View all <ArrowRight className="ml-2 inline h-3.5 w-3.5" /></Link></div>
+        <div className="grid gap-5 md:grid-cols-3">{summary?.featuredVendors?.slice(0, 3).map((vendor) => <Link key={vendor.id} href={`/vendor/${vendor.id}`} className="vendor-tile"><div className="vendor-tile-mark">{vendor.logoUrl ? <img src={vendor.logoUrl} alt="" /> : vendor.brandName.charAt(0)}</div><div><p className="eyebrow">{vendor.description || "Independent atelier"}</p><h3>{vendor.brandName}</h3></div><ArrowRight className="h-4 w-4" /></Link>)}</div>
       </section>
+      <QuickAddDrawer product={quickAdd} onClose={() => setQuickAdd(null)} />
     </div>
   );
 }

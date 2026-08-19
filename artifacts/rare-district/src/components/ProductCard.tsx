@@ -108,7 +108,7 @@ export function ProductCard({ product, dataTestId, showWardrobe = true }: Produc
             alt={product.name}
             className="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out"
             loading="lazy"
-          /> : <div className="absolute inset-0 starfield flex items-center justify-center"><span className="font-serif text-3xl text-primary/60">RD</span></div>}
+          /> : <div className="product-placeholder absolute inset-0"><span className="product-placeholder-index">RD / {String(product.id).padStart(2, "0")}</span><strong>{product.name}</strong><span>{product.vendor?.brandName || "Rare District"}</span></div>}
           {product.stock === 0 && (
             <span className="absolute top-3 left-3 bg-background/85 border border-primary/45 px-3 py-1 text-[10px] font-bold tracking-widest uppercase backdrop-blur-md">
               Sold Out

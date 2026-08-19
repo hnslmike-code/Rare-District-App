@@ -85,7 +85,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20 nebula-surface pb-24 md:pb-0">
+    <div className="min-h-[100dvh] flex flex-col bg-background selection:bg-primary/20 pb-24 md:pb-0">
       <CursorGlow />
       {/* ── Top Header ── */}
       <header className="sticky top-0 z-50 w-full glass-header">
@@ -229,7 +229,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       {/* ── Search Overlay ── */}
       {searchOpen && (
           <div
-            className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-xl starfield flex flex-col items-center justify-center px-6 animate-in fade-in duration-200"
+            className="fixed inset-0 z-[60] bg-background/95 backdrop-blur-xl flex flex-col items-center justify-center px-6 animate-in fade-in duration-200"
           onClick={(e) => { if (e.target === e.currentTarget) setSearchOpen(false); }}
         >
           <button
@@ -274,7 +274,7 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1">{children}</main>
 
       {/* ── Footer ── */}
-       <footer className="rd-footer mt-auto border-t border-primary/25 bg-[hsl(229_25%_5%)] py-16 text-foreground md:py-24">
+        <footer className="rd-footer mt-auto border-t border-border bg-background py-16 text-foreground md:py-24">
         <div className="container mx-auto px-4 md:px-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-12">
             <div className="md:col-span-2">
@@ -283,28 +283,28 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                  alt="Rare District — Built Different. Made Rare. Lagos, worldwide."
                  className="rd-footer-lockup mb-7"
                />
-              <p className="text-muted text-sm max-w-sm leading-relaxed">
+              <p className="text-muted-foreground text-sm max-w-sm leading-relaxed">
                 Curating the absolute vanguard of contemporary Nigerian fashion. A private district for the discerning eye.
               </p>
             </div>
             <div>
-              <h3 className="font-serif text-lg mb-6 text-primary-foreground">The District</h3>
-              <ul className="space-y-4 text-sm text-muted">
+               <h3 className="font-serif text-lg mb-6">The District</h3>
+               <ul className="space-y-4 text-sm text-muted-foreground">
                 <li><Link href="/shop" className="hover:text-primary transition-colors">Shop All</Link></li>
                 <li><Link href="/shop?category=designers" className="hover:text-primary transition-colors">Designers</Link></li>
                 <li><Link href="/vendor-dashboard/apply" className="hover:text-primary transition-colors">Become a Vendor</Link></li>
               </ul>
             </div>
             <div>
-              <h3 className="font-serif text-lg mb-6 text-primary-foreground">Assistance</h3>
-              <ul className="space-y-4 text-sm text-muted">
+               <h3 className="font-serif text-lg mb-6">Assistance</h3>
+               <ul className="space-y-4 text-sm text-muted-foreground">
                 <li><button className="hover:text-primary transition-colors">Contact Us</button></li>
                 <li><button className="hover:text-primary transition-colors">Shipping &amp; Returns</button></li>
                 <li><button className="hover:text-primary transition-colors">Terms of Service</button></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-background/20 mt-16 pt-8 flex flex-col md:flex-row items-center justify-between text-xs text-muted">
+           <div className="border-t border-border mt-16 pt-8 flex flex-col md:flex-row items-center justify-between text-xs text-muted-foreground">
             <p>&copy; {new Date().getFullYear()} Rare District. All rights reserved.</p>
             <div className="flex gap-4 mt-4 md:mt-0">
               <span>Lagos</span>
