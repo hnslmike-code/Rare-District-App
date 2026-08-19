@@ -13,6 +13,35 @@ const databaseUrl = process.env.DATABASE_URL;
 const suffix = randomUUID().replaceAll("-", "");
 const apiPort = 18110;
 const apiUrl = `http://127.0.0.1:${apiPort}/api`;
+const paymentProviderMock = resolve(import.meta.dirname, "mock-payment-provider.mjs");
+
+function assertNoPrivateFields(value) {
+  const privateFields = new Set([
+    "email",
+    "role",
+    "bankName",
+    "accountNumber",
+    "accountName",
+    "payoutBalance",
+    "commissionRateOverride",
+    "adminNote",
+    "referralCode",
+  ]);
+
+  function visit(current) {
+    if (Array.isArray(current)) {
+      current.forEach(visit);
+      return;
+    }
+    if (!current || typeof current !== "object") return;
+    for (const [key, nestedValue] of Object.entries(current)) {
+      assert.equal(privateFields.has(key), false, `public response leaked "${key}"`);
+      visit(nestedValue);
+    }
+  }
+
+  visit(value);
+}
 
 function auth(user) {
   return {
@@ -50,7 +79,7 @@ if (!databaseUrl) {
     const pool = new Pool({ connectionString: databaseUrl });
     const created = { users: [], vendors: [], products: [], orders: [], orderItems: [], transactions: [], payouts: [] };
     const serverOutput = [];
-    const server = spawn(process.execPath, ["--enable-source-maps", "./dist/index.mjs"], {
+    const server = spawn(process.execPath, ["--import", paymentProviderMock, "--enable-source-maps", "./dist/index.mjs"], {
       cwd: resolve(import.meta.dirname, ".."),
       env: { ...process.env, NODE_ENV: "test", PORT: String(apiPort) },
       stdio: ["ignore", "pipe", "pipe"],
@@ -98,6 +127,39 @@ if (!databaseUrl) {
       }
 
       return orderId;
+    }
+
+    function trackOrder(order) {
+      created.orders.push(order.id);
+      created.orderItems.push(...order.items.map(item => item.id));
+      return order;
+    }
+
+    async function checkout(user, productId, quantity = 1) {
+      const response = await fetch(`${apiUrl}/orders`, {
+        method: "POST",
+        headers: auth(user),
+        body: JSON.stringify({
+          items: [{ productId, quantity }],
+          shippingAddress: "1 Regression Road",
+          shippingCity: "Lagos",
+          shippingState: "Lagos",
+          shippingPhone: "08000000000",
+        }),
+      });
+      const payload = await response.json();
+      if (response.status === 201) trackOrder(payload);
+      return { response, payload };
+    }
+
+    async function stockFor(productId) {
+      const result = await query("SELECT stock FROM products WHERE id = $1", [productId]);
+      return result.rows[0].stock;
+    }
+
+    async function payoutBalanceFor(vendorId) {
+      const result = await query("SELECT payout_balance FROM vendors WHERE id = $1", [vendorId]);
+      return Number(result.rows[0].payout_balance);
     }
 
     try {
@@ -150,11 +212,12 @@ if (!databaseUrl) {
       const productResult = await query(
         `INSERT INTO products (vendor_id, name, price, stock) VALUES
           ($1, $2, 1000, 5),
-          ($3, $4, 2000, 5)
+           ($3, $4, 2000, 5),
+           ($1, $5, 1000, 1)
         RETURNING id`,
-        [vendorA.id, `A Product ${suffix}`, vendorB.id, `B Product ${suffix}`],
+        [vendorA.id, `A Product ${suffix}`, vendorB.id, `B Product ${suffix}`, `Limited Product ${suffix}`],
       );
-      const [productA, productB] = productResult.rows;
+      const [productA, productB, limitedProduct] = productResult.rows;
       created.products.push(...productResult.rows.map(product => product.id));
 
       const mixedOrderId = await createOrder(buyer.id, "paid", [
@@ -202,6 +265,7 @@ if (!databaseUrl) {
       const vendorDetailResponse = await fetch(`${apiUrl}/admin/vendors/${vendorA.id}`, {
         headers: auth(adminUser),
       });
+      if (!vendorDetailResponse.ok) assert.fail(await vendorDetailResponse.text());
       assert.equal(vendorDetailResponse.status, 200);
       const vendorDetail = await vendorDetailResponse.json();
       assert.equal(vendorDetail.vendor.id, vendorA.id);
@@ -224,6 +288,19 @@ if (!databaseUrl) {
       assert.ok(vendorDetail.notes.some(note => note.text === "Retain this note"));
       assert.ok(vendorDetail.decisions.some(decision => decision.status === "approved"));
       assert.ok(vendorDetail.auditEvents.some(event => event.action === "vendor_approved"));
+
+      await query(
+        "UPDATE vendors SET bank_name = $1, account_number = $2, account_name = $3 WHERE id = $4",
+        ["Sensitive Bank", "0123456789", "Private Account", vendorA.id],
+      );
+      const [publicVendorResponse, publicProductResponse] = await Promise.all([
+        fetch(`${apiUrl}/vendors/${vendorA.id}`),
+        fetch(`${apiUrl}/products/${productA.id}`),
+      ]);
+      assert.equal(publicVendorResponse.status, 200);
+      assert.equal(publicProductResponse.status, 200);
+      assertNoPrivateFields(await publicVendorResponse.json());
+      assertNoPrivateFields(await publicProductResponse.json());
 
       const nonAdminVendorDetailResponse = await fetch(`${apiUrl}/admin/vendors/${vendorA.id}`, {
         headers: auth(vendorAUser),
@@ -264,6 +341,36 @@ if (!databaseUrl) {
       const singleOrderAfterVendorUpdate = await query("SELECT status FROM orders WHERE id = $1", [cancellableOrderId]);
       assert.equal(singleOrderAfterVendorUpdate.rows[0].status, "processing");
 
+      const mixedOrderItems = await query(
+        "SELECT id, vendor_id, fulfillment_status FROM order_items WHERE order_id = $1 ORDER BY vendor_id",
+        [mixedOrderId],
+      );
+      const vendorAItem = mixedOrderItems.rows.find(item => item.vendor_id === vendorA.id);
+      const vendorBItem = mixedOrderItems.rows.find(item => item.vendor_id === vendorB.id);
+      const crossVendorFulfillmentResponse = await fetch(
+        `${apiUrl}/vendors/orders/${mixedOrderId}/items/${vendorBItem.id}/fulfillment`,
+        {
+          method: "PATCH",
+          headers: auth(vendorAUser),
+          body: JSON.stringify({ status: "processing" }),
+        },
+      );
+      assert.equal(crossVendorFulfillmentResponse.status, 404);
+      const ownFulfillmentResponse = await fetch(
+        `${apiUrl}/vendors/orders/${mixedOrderId}/items/${vendorAItem.id}/fulfillment`,
+        {
+          method: "PATCH",
+          headers: auth(vendorAUser),
+          body: JSON.stringify({ status: "processing" }),
+        },
+      );
+      assert.equal(ownFulfillmentResponse.status, 200);
+      const siblingItemAfterAttempt = await query(
+        "SELECT fulfillment_status FROM order_items WHERE id = $1",
+        [vendorBItem.id],
+      );
+      assert.equal(siblingItemAfterAttempt.rows[0].fulfillment_status, "pending");
+
       const cancellationResponse = await fetch(`${apiUrl}/orders/${cancellableOrderId}/status`, {
         method: "PATCH",
         headers: auth(buyer),
@@ -292,6 +399,136 @@ if (!databaseUrl) {
       });
       assert.equal(paymentOwnershipResponse.status, 404);
 
+      const concurrentReservations = await Promise.all([
+        checkout(buyer, limitedProduct.id),
+        checkout(buyer, limitedProduct.id),
+      ]);
+      assert.deepEqual(
+        concurrentReservations.map(({ response }) => response.status).sort(),
+        [201, 409],
+      );
+      assert.equal(await stockFor(limitedProduct.id), 0);
+
+      const stockBeforeCancellation = await stockFor(productA.id);
+      const { response: cancellableCheckoutResponse, payload: cancellableCheckout } = await checkout(buyer, productA.id);
+      assert.equal(cancellableCheckoutResponse.status, 201);
+      assert.equal(await stockFor(productA.id), stockBeforeCancellation - 1);
+      const cancellationReleaseResponse = await fetch(`${apiUrl}/orders/${cancellableCheckout.id}/status`, {
+        method: "PATCH",
+        headers: auth(buyer),
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      assert.equal(cancellationReleaseResponse.status, 200);
+      assert.equal(await stockFor(productA.id), stockBeforeCancellation);
+
+      const stockBeforePaymentFailure = await stockFor(productA.id);
+      const { response: failedPaymentCheckoutResponse, payload: failedPaymentCheckout } = await checkout(buyer, productA.id);
+      assert.equal(failedPaymentCheckoutResponse.status, 201);
+      const failedPaymentReference = `payment-failure-${suffix}`;
+      await query(
+        "UPDATE orders SET payment_processor = 'paystack', payment_reference = $1 WHERE id = $2",
+        [failedPaymentReference, failedPaymentCheckout.id],
+      );
+      const failedPaymentResponse = await fetch(`${apiUrl}/payments/paystack/verify`, {
+        method: "POST",
+        headers: auth(buyer),
+        body: JSON.stringify({ reference: failedPaymentReference }),
+      });
+      assert.equal(failedPaymentResponse.status, 200);
+      assert.equal((await failedPaymentResponse.json()).status, "failed");
+      assert.equal(await stockFor(productA.id), stockBeforePaymentFailure);
+      const failedPaymentOrder = await query(
+        "SELECT status, inventory_released_at FROM orders WHERE id = $1",
+        [failedPaymentCheckout.id],
+      );
+      assert.equal(failedPaymentOrder.rows[0].status, "cancelled");
+      assert.notEqual(failedPaymentOrder.rows[0].inventory_released_at, null);
+
+      const { response: paidCheckoutResponse, payload: paidCheckout } = await checkout(buyer, productA.id);
+      assert.equal(paidCheckoutResponse.status, 201);
+      const paidReference = `payment-success-${suffix}`;
+      const payoutBalanceBeforeVerification = await payoutBalanceFor(vendorA.id);
+      await query(
+        "UPDATE orders SET payment_processor = 'paystack', payment_reference = $1 WHERE id = $2",
+        [paidReference, paidCheckout.id],
+      );
+      const verificationResponses = await Promise.all([
+        fetch(`${apiUrl}/payments/paystack/verify`, {
+          method: "POST",
+          headers: auth(buyer),
+          body: JSON.stringify({ reference: paidReference }),
+        }),
+        fetch(`${apiUrl}/payments/paystack/verify`, {
+          method: "POST",
+          headers: auth(buyer),
+          body: JSON.stringify({ reference: paidReference }),
+        }),
+      ]);
+      assert.deepEqual(verificationResponses.map(response => response.status), [200, 200]);
+      assert.deepEqual(await Promise.all(verificationResponses.map(response => response.json().then(body => body.success))), [true, true]);
+      const salesForRepeatedVerification = await query(
+        "SELECT vendor_amount FROM transactions WHERE order_id = $1 AND transaction_type = 'sale'",
+        [paidCheckout.id],
+      );
+      assert.equal(salesForRepeatedVerification.rows.length, 1);
+      assert.equal(
+        await payoutBalanceFor(vendorA.id),
+        payoutBalanceBeforeVerification + Number(salesForRepeatedVerification.rows[0].vendor_amount),
+      );
+
+      await query("UPDATE vendors SET payout_balance = 3000 WHERE id = $1", [vendorA.id]);
+      const failedPayoutRequest = await fetch(`${apiUrl}/vendors/me/payout-request`, {
+        method: "POST",
+        headers: auth(vendorAUser),
+        body: JSON.stringify({ amount: 1000 }),
+      });
+      assert.equal(failedPayoutRequest.status, 201);
+      const failedPayout = await failedPayoutRequest.json();
+      created.payouts.push(failedPayout.id);
+      assert.equal(await payoutBalanceFor(vendorA.id), 2000);
+      const failedPayoutResponse = await fetch(`${apiUrl}/admin/payouts/${failedPayout.id}`, {
+        method: "PATCH",
+        headers: auth(adminUser),
+        body: JSON.stringify({ status: "failed" }),
+      });
+      assert.equal(failedPayoutResponse.status, 200);
+      assert.equal((await failedPayoutResponse.json()).status, "failed");
+      assert.equal(await payoutBalanceFor(vendorA.id), 3000);
+
+      const reversedPayoutRequest = await fetch(`${apiUrl}/vendors/me/payout-request`, {
+        method: "POST",
+        headers: auth(vendorAUser),
+        body: JSON.stringify({ amount: 1000 }),
+      });
+      assert.equal(reversedPayoutRequest.status, 201);
+      const reversedPayout = await reversedPayoutRequest.json();
+      created.payouts.push(reversedPayout.id);
+      assert.equal((await fetch(`${apiUrl}/admin/payouts/${reversedPayout.id}`, {
+        method: "PATCH",
+        headers: auth(adminUser),
+        body: JSON.stringify({ status: "approved" }),
+      })).status, 200);
+      assert.equal((await fetch(`${apiUrl}/admin/payouts/${reversedPayout.id}`, {
+        method: "PATCH",
+        headers: auth(adminUser),
+        body: JSON.stringify({ status: "paid" }),
+      })).status, 200);
+      const reversedPayoutResponse = await fetch(`${apiUrl}/admin/payouts/${reversedPayout.id}`, {
+        method: "PATCH",
+        headers: auth(adminUser),
+        body: JSON.stringify({ status: "reversed" }),
+      });
+      assert.equal(reversedPayoutResponse.status, 200);
+      assert.equal((await reversedPayoutResponse.json()).status, "reversed");
+      assert.equal(await payoutBalanceFor(vendorA.id), 3000);
+      const repeatedReversalResponse = await fetch(`${apiUrl}/admin/payouts/${reversedPayout.id}`, {
+        method: "PATCH",
+        headers: auth(adminUser),
+        body: JSON.stringify({ status: "reversed" }),
+      });
+      assert.equal(repeatedReversalResponse.status, 409);
+      assert.equal(await payoutBalanceFor(vendorA.id), 3000);
+
       for (const user of [pendingUser, rejectedUser, suspendedUser]) {
         const dashboardResponse = await fetch(`${apiUrl}/vendors/dashboard`, { headers: auth(user) });
         assert.equal(dashboardResponse.status, 403);
@@ -300,6 +537,7 @@ if (!databaseUrl) {
       try {
         if (created.vendors.length) await query("DELETE FROM admin_audit_logs WHERE entity_type = 'vendor' AND entity_id = ANY($1::text[])", [created.vendors.map(String)]);
         if (created.payouts.length) await query("DELETE FROM payout_records WHERE id = ANY($1::int[])", [created.payouts]);
+        if (created.orders.length) await query("DELETE FROM transactions WHERE order_id = ANY($1::int[])", [created.orders]);
         if (created.transactions.length) await query("DELETE FROM transactions WHERE id = ANY($1::int[])", [created.transactions]);
         if (created.orderItems.length) await query("DELETE FROM order_items WHERE id = ANY($1::int[])", [created.orderItems]);
         if (created.orders.length) await query("DELETE FROM orders WHERE id = ANY($1::int[])", [created.orders]);
