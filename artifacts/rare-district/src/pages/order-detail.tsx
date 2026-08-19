@@ -1,10 +1,11 @@
 import { Link, useRoute } from "wouter";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useGetOrder } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ArrowLeft, MapPin, Truck, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { ReturnShippingConversation } from "@/components/returns/ReturnShippingConversation";
 
 export default function OrderDetail() {
   const [, params] = useRoute("/orders/:id");
@@ -14,6 +15,7 @@ export default function OrderDetail() {
   const [returnReason, setReturnReason] = useState("wrong_item");
   const [returnDescription, setReturnDescription] = useState("");
   const [returnSubmitting, setReturnSubmitting] = useState(false);
+  const [customerReturns, setCustomerReturns] = useState<any[]>([]);
 
   const { data: order, isLoading } = useGetOrder(id, {
     query: {
@@ -21,6 +23,11 @@ export default function OrderDetail() {
       queryKey: ["order", id]
     }
   });
+  const loadCustomerReturns = async () => {
+    const response = await fetch("/api/returns/mine", { headers: { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` } });
+    if (response.ok) setCustomerReturns(await response.json());
+  };
+  useEffect(() => { if (id) void loadCustomerReturns(); }, [id]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -66,6 +73,7 @@ export default function OrderDetail() {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "Return request failed.");
       toast({ title: "Return request submitted.", description: "The vendor has 48 hours to respond." });
+      setCustomerReturns(current => [...current, result]);
       setReturningItemId(null);
       setReturnDescription("");
     } catch (error) {
@@ -157,7 +165,7 @@ export default function OrderDetail() {
                   <div className="text-right">
                     <p className="text-lg font-light mb-1">₦{(item.unitPrice * item.quantity).toLocaleString()}</p>
                     <p className="text-xs text-muted-foreground">Qty: {item.quantity} × ₦{item.unitPrice.toLocaleString()}</p>
-                    {["delivered", "shipped"].includes(order.status) && (
+                    {["delivered", "shipped"].includes(order.status) && !customerReturns.some(request => request.orderItemId === item.id && !["rejected", "cancelled", "refunded"].includes(request.status)) && (
                       <button onClick={() => setReturningItemId(returningItemId === item.id ? null : item.id)} className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground underline">Request return</button>
                     )}
                   </div>
@@ -173,6 +181,9 @@ export default function OrderDetail() {
                     <div className="mt-3 flex justify-end"><button onClick={() => submitReturn(item.id)} disabled={returnSubmitting} className="bg-foreground px-4 py-2 text-xs font-bold uppercase tracking-widest text-background disabled:opacity-50">{returnSubmitting ? "Submitting…" : "Submit request"}</button></div>
                   </div>
                 )}
+                {customerReturns.filter(request => request.orderItemId === item.id && !["rejected", "cancelled"].includes(request.status)).map(request => (
+                  <ReturnShippingConversation key={request.id} returnId={request.id} role="customer" onChange={() => void loadCustomerReturns()} />
+                ))}
               </div>
             </div>
           ))}

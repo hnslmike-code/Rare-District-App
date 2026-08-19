@@ -3,7 +3,8 @@ import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import {
   db, productsTable, productVariantsTable, inventoryAdjustmentTable,
   inventoryReservationTable, ordersTable, orderItemsTable, returnsTable,
-  returnMessagesTable, notificationsTable, vendorsTable,
+  returnMessagesTable, returnShippingProposalsTable, returnAuditEventsTable,
+  notificationsTable, vendorsTable,
 } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { hasApprovedVendorAccess } from "../lib/security-boundaries";
@@ -19,6 +20,47 @@ const variantAttributes = (value: unknown): Record<string, string> =>
 async function approvedVendor(userId: number) {
   const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId));
   return vendor && hasApprovedVendorAccess(vendor.status) ? vendor : undefined;
+}
+
+async function returnParticipantRole(userId: number, request: typeof returnsTable.$inferSelect) {
+  if (request.customerId === userId) return "customer" as const;
+  const vendor = await approvedVendor(userId);
+  return vendor?.id === request.vendorId ? "vendor" as const : undefined;
+}
+
+async function notifyReturnParticipant(
+  tx: any,
+  userId: number,
+  title: string,
+  body: string,
+  href: string,
+) {
+  await tx.insert(notificationsTable).values({
+    userId,
+    type: "return",
+    title,
+    body,
+    href,
+  });
+}
+
+function parseShippingProposal(value: unknown) {
+  const source = value as Record<string, unknown> | undefined;
+  const payer = source?.payer;
+  const rawAmount = typeof source?.amount === "number" || typeof source?.amount === "string" ? String(source.amount).trim() : "";
+  const instructions = typeof source?.instructions === "string" ? source.instructions.trim().slice(0, 1000) : "";
+  const note = typeof source?.note === "string" ? source.note.trim().slice(0, 1000) : "";
+  if (!["vendor", "customer", "shared"].includes(String(payer)) || !/^\d+(?:\.\d{1,2})?$/.test(rawAmount)) {
+    return undefined;
+  }
+  const amountInKobo = Math.round(Number(rawAmount) * 100);
+  if (!Number.isSafeInteger(amountInKobo) || amountInKobo < 0 || amountInKobo > 500_000_000) return undefined;
+  return {
+    payer: payer as "vendor" | "customer" | "shared",
+    amount: (amountInKobo / 100).toFixed(2),
+    instructions: instructions || null,
+    note: note || null,
+  };
 }
 
 async function ownProduct(userId: number, productId: number) {
@@ -371,6 +413,10 @@ router.post("/returns", requireAuth, async (req, res): Promise<void> => {
       description: typeof req.body?.description === "string" ? req.body.description.slice(0, 2000) : null,
       refundAmount: String(parseFloat(item.unitPrice) * item.quantity), requestedAt, responseDeadline,
     }).returning();
+    await tx.insert(returnAuditEventsTable).values({
+      returnId: request.id, actorId: req.user!.userId, action: "return_requested",
+      details: { reason, responseDeadline: responseDeadline.toISOString() },
+    });
     const [vendor] = await tx.select().from(vendorsTable).where(eq(vendorsTable.id, item.vendorId));
     if (vendor) await createVendorAlert(tx, vendor, {
       type: "return",
@@ -400,34 +446,54 @@ router.patch("/vendors/returns/:id", requireAuth, async (req, res): Promise<void
   const returnId = Number(req.params.id);
   const nextStatus = req.body?.status;
   if (!vendor || !["approved", "rejected", "received", "inspected"].includes(nextStatus)) { res.status(400).json({ error: "Invalid return update." }); return; }
-  const [request] = await db.select().from(returnsTable).where(and(eq(returnsTable.id, returnId), eq(returnsTable.vendorId, vendor.id)));
-  if (!request) { res.status(404).json({ error: "Return request not found." }); return; }
   const transitions: Record<string, string[]> = { requested: ["approved", "rejected"], approved: ["received"], received: ["inspected"], inspected: [], rejected: [], refunded: [], disputed: [] };
-  if (!transitions[request.status]?.includes(nextStatus)) { res.status(409).json({ error: `Cannot move return from ${request.status} to ${nextStatus}.` }); return; }
-  const updated = await db.transaction(async tx => {
-    let nextStock = false;
-    if (nextStatus === "inspected") nextStock = Boolean(req.body?.resalable);
+  let updated: typeof returnsTable.$inferSelect | undefined;
+  try {
+    updated = await db.transaction(async tx => {
+    await tx.execute(sql`SELECT id FROM returns WHERE id = ${returnId} FOR UPDATE`);
+    const [request] = await tx.select().from(returnsTable).where(and(eq(returnsTable.id, returnId), eq(returnsTable.vendorId, vendor.id)));
+    if (!request) throw new Error("RETURN_NOT_FOUND");
+    if (!transitions[request.status]?.includes(nextStatus)) throw new Error("INVALID_TRANSITION");
+    if (nextStatus === "approved" && (!request.shippingAgreementProposalId || request.shippingDecision === "undecided")) throw new Error("SHIPPING_NOT_AGREED");
+    if (nextStatus === "inspected") {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${request.orderId} FOR UPDATE`);
+      await tx.execute(sql`SELECT id FROM order_items WHERE id = ${request.orderItemId} FOR UPDATE`);
+    }
+    const nextStock = nextStatus === "inspected" && Boolean(req.body?.resalable);
     const [next] = await tx.update(returnsTable).set({
       status: nextStatus,
       approvedAt: nextStatus === "approved" ? new Date() : request.approvedAt,
       rejectedAt: nextStatus === "rejected" ? new Date() : null,
       receivedAt: nextStatus === "received" ? new Date() : request.receivedAt,
       inspectedAt: nextStatus === "inspected" ? new Date() : request.inspectedAt,
-      shippingDecision: ["vendor", "customer", "shared", "undecided"].includes(req.body?.shippingDecision) ? req.body.shippingDecision : request.shippingDecision,
-      shippingInstructions: typeof req.body?.shippingInstructions === "string" ? req.body.shippingInstructions.slice(0, 1000) : request.shippingInstructions,
       resolutionNote: typeof req.body?.resolutionNote === "string" ? req.body.resolutionNote.slice(0, 1000) : request.resolutionNote,
     }).where(eq(returnsTable.id, returnId)).returning();
+    await tx.insert(returnAuditEventsTable).values({
+      returnId, actorId: req.user!.userId, action: `return_${nextStatus}`,
+      details: { resalable: nextStatus === "inspected" ? nextStock : undefined, shippingAgreementProposalId: next.shippingAgreementProposalId },
+    });
     if (nextStock) {
       const [returnedItem] = await tx.select({ productId: orderItemsTable.productId, quantity: orderItemsTable.quantity })
         .from(orderItemsTable).where(eq(orderItemsTable.id, request.orderItemId));
-      if (returnedItem) {
-        await tx.update(productsTable)
-          .set({ stock: sql`${productsTable.stock} + ${returnedItem.quantity}` })
-          .where(eq(productsTable.id, returnedItem.productId));
-      }
+      if (returnedItem) await tx.update(productsTable)
+        .set({ stock: sql`${productsTable.stock} + ${returnedItem.quantity}` })
+        .where(eq(productsTable.id, returnedItem.productId));
     }
-    return next;
-  });
+    await notifyReturnParticipant(
+      tx, request.customerId,
+      nextStatus === "approved" ? "Return approved" : `Return ${nextStatus.replace("_", " ")}`,
+      nextStatus === "approved" ? "Your return has been approved. Follow the agreed shipping instructions." : `Your return is now marked ${nextStatus.replace("_", " ")}.`,
+      `/orders/${request.orderId}`,
+    );
+      return next;
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "RETURN_NOT_FOUND") { res.status(404).json({ error: "Return request not found." }); return; }
+    if (error instanceof Error && error.message === "INVALID_TRANSITION") { res.status(409).json({ error: "Cannot move this return from its current status." }); return; }
+    if (error instanceof Error && error.message === "SHIPPING_NOT_AGREED") { res.status(409).json({ error: "Agree on return shipping before approving this return." }); return; }
+    throw error;
+  }
+  if (!updated) { res.status(404).json({ error: "Return request not found." }); return; }
   res.json(updated);
 });
 
@@ -447,12 +513,25 @@ router.post("/returns/:id/refund", requireAuth, async (req, res): Promise<void> 
     await tx.execute(sql`SELECT id FROM returns WHERE id = ${returnId} FOR UPDATE`);
     const [locked] = await tx.select().from(returnsTable).where(eq(returnsTable.id, returnId));
     if (!locked || locked.status !== "inspected") throw new Error("RETURN_NOT_READY");
+    await tx.execute(sql`SELECT id FROM orders WHERE id = ${locked.orderId} FOR UPDATE`);
+    await tx.execute(sql`SELECT id FROM order_items WHERE id = ${locked.orderItemId} FOR UPDATE`);
     const [order] = await tx.select().from(ordersTable).where(eq(ordersTable.id, locked.orderId));
     const [item] = await tx.select().from(orderItemsTable).where(eq(orderItemsTable.id, locked.orderItemId));
     if (!order || !item) throw new Error("RETURN_NOT_FOUND");
     await recordOrderItemLedgerEntry(tx, order, item, "refund");
     await tx.update(orderItemsTable).set({ fulfillmentStatus: "refunded" }).where(eq(orderItemsTable.id, item.id));
     const [next] = await tx.update(returnsTable).set({ status: "refunded", refundedAt: new Date() }).where(eq(returnsTable.id, returnId)).returning();
+    await tx.insert(returnAuditEventsTable).values({
+      returnId, actorId: req.user!.userId, action: "return_refunded",
+      details: { refundAmount: next.refundAmount, orderItemId: item.id },
+    });
+    const [vendor] = await tx.select().from(vendorsTable).where(eq(vendorsTable.id, locked.vendorId));
+    if (req.user!.userId === locked.customerId) {
+      if (vendor) await notifyReturnParticipant(tx, vendor.userId, "Return refunded", "A customer finalized the refund for an inspected return.", "/vendor-dashboard/returns");
+    } else {
+      await notifyReturnParticipant(tx, locked.customerId, "Return refunded", "Your inspected return has been finalized for refund.", `/orders/${locked.orderId}`);
+      if (vendor) await notifyReturnParticipant(tx, vendor.userId, "Return refunded", "An inspected return has been finalized for refund.", "/vendor-dashboard/returns");
+    }
     return next;
   }).catch(error => {
     if (error instanceof Error && error.message === "RETURN_NOT_READY") return undefined;
@@ -470,6 +549,116 @@ router.get("/returns/:id/messages", requireAuth, async (req, res): Promise<void>
   res.json(await db.select().from(returnMessagesTable).where(eq(returnMessagesTable.returnId, returnId)).orderBy(returnMessagesTable.createdAt));
 });
 
+// A single negotiated view keeps the customer and vendor looking at the same
+// messages, shipping proposals, and immutable event history.
+router.get("/returns/:id/conversation", requireAuth, async (req, res): Promise<void> => {
+  const returnId = Number(req.params.id);
+  const [request] = await db.select().from(returnsTable).where(eq(returnsTable.id, returnId));
+  if (!request || !await returnParticipantRole(req.user!.userId, request)) { res.status(404).json({ error: "Return not found." }); return; }
+  const [messages, proposals, audit] = await Promise.all([
+    db.select().from(returnMessagesTable).where(eq(returnMessagesTable.returnId, returnId)).orderBy(returnMessagesTable.createdAt),
+    db.select().from(returnShippingProposalsTable).where(eq(returnShippingProposalsTable.returnId, returnId)).orderBy(desc(returnShippingProposalsTable.createdAt)),
+    db.select().from(returnAuditEventsTable).where(eq(returnAuditEventsTable.returnId, returnId)).orderBy(returnAuditEventsTable.createdAt),
+  ]);
+  res.json({ request, messages, proposals, audit });
+});
+
+router.post("/returns/:id/shipping-proposals", requireAuth, async (req, res): Promise<void> => {
+  const returnId = Number(req.params.id);
+  const proposal = parseShippingProposal(req.body);
+  const [request] = await db.select().from(returnsTable).where(eq(returnsTable.id, returnId));
+  const role = request && await returnParticipantRole(req.user!.userId, request);
+  if (!request || !role) { res.status(404).json({ error: "Return not found." }); return; }
+  if (!proposal) { res.status(400).json({ error: "Choose who pays and enter a valid shipping amount." }); return; }
+  let created: typeof returnShippingProposalsTable.$inferSelect | undefined;
+  try {
+    created = await db.transaction(async tx => {
+    await tx.execute(sql`SELECT id FROM returns WHERE id = ${returnId} FOR UPDATE`);
+    const [locked] = await tx.select().from(returnsTable).where(eq(returnsTable.id, returnId));
+    if (!locked || locked.status !== "requested") throw new Error("SHIPPING_CLOSED");
+    if (locked.shippingAgreementProposalId || locked.shippingDecision !== "undecided") throw new Error("SHIPPING_AGREED");
+    await tx.update(returnShippingProposalsTable).set({ status: "countered", respondedBy: req.user!.userId, respondedAt: new Date() })
+      .where(and(eq(returnShippingProposalsTable.returnId, returnId), eq(returnShippingProposalsTable.status, "proposed")));
+    const [next] = await tx.insert(returnShippingProposalsTable).values({
+      returnId, proposedBy: req.user!.userId, payer: proposal.payer, amount: proposal.amount,
+      instructions: proposal.instructions, note: proposal.note,
+    }).returning();
+    await tx.insert(returnAuditEventsTable).values({
+      returnId, actorId: req.user!.userId, action: "shipping_proposed",
+      details: { payer: proposal.payer, amount: proposal.amount, instructions: proposal.instructions },
+    });
+    const destination = role === "vendor" ? locked.customerId : (await tx.select().from(vendorsTable).where(eq(vendorsTable.id, locked.vendorId)))[0]?.userId;
+    if (destination) await notifyReturnParticipant(tx, destination, "Return shipping proposal", "A shipping-cost proposal needs your response.", role === "vendor" ? `/orders/${locked.orderId}` : "/vendor-dashboard/returns");
+    return next;
+    });
+  } catch (error) {
+    if (error instanceof Error && ["SHIPPING_CLOSED", "SHIPPING_AGREED"].includes(error.message)) { res.status(409).json({ error: "Return shipping terms have already been settled or this return is no longer awaiting approval." }); return; }
+    throw error;
+  }
+  res.status(201).json(created);
+});
+
+router.post("/returns/:id/shipping-proposals/:proposalId/respond", requireAuth, async (req, res): Promise<void> => {
+  const returnId = Number(req.params.id);
+  const proposalId = Number(req.params.proposalId);
+  const action = req.body?.action;
+  const [request] = await db.select().from(returnsTable).where(eq(returnsTable.id, returnId));
+  const role = request && await returnParticipantRole(req.user!.userId, request);
+  if (!request || !role) { res.status(404).json({ error: "Return not found." }); return; }
+  if (!["accept", "decline", "counter"].includes(action)) { res.status(400).json({ error: "Choose accept, decline, or counter." }); return; }
+  const counter = action === "counter" ? parseShippingProposal(req.body) : undefined;
+  if (action === "counter" && !counter) { res.status(400).json({ error: "Your counter-proposal needs a payer and valid amount." }); return; }
+  let result: { proposal: typeof returnShippingProposalsTable.$inferSelect; shippingDecision: string } | undefined;
+  try {
+    result = await db.transaction(async tx => {
+    await tx.execute(sql`SELECT id FROM returns WHERE id = ${returnId} FOR UPDATE`);
+    const [lockedRequest] = await tx.select().from(returnsTable).where(eq(returnsTable.id, returnId));
+    if (!lockedRequest || lockedRequest.status !== "requested" || lockedRequest.shippingAgreementProposalId || lockedRequest.shippingDecision !== "undecided") throw new Error("SHIPPING_CLOSED");
+    const [current] = await tx.select().from(returnShippingProposalsTable).where(and(
+      eq(returnShippingProposalsTable.id, proposalId),
+      eq(returnShippingProposalsTable.returnId, returnId),
+    ));
+    if (!current || current.status !== "proposed" || current.proposedBy === req.user!.userId) throw new Error("PROPOSAL_UNAVAILABLE");
+    const status = action === "accept" ? "accepted" : action === "decline" ? "declined" : "countered";
+    await tx.update(returnShippingProposalsTable).set({ status, respondedBy: req.user!.userId, respondedAt: new Date() })
+      .where(eq(returnShippingProposalsTable.id, proposalId));
+    let nextProposal: typeof returnShippingProposalsTable.$inferSelect | undefined;
+    if (action === "accept") {
+      await tx.update(returnsTable).set({
+        shippingDecision: current.payer,
+        shippingInstructions: current.instructions,
+        shippingAgreementProposalId: current.id,
+      }).where(eq(returnsTable.id, returnId));
+    }
+    if (action === "counter" && counter) {
+      [nextProposal] = await tx.insert(returnShippingProposalsTable).values({
+        returnId, parentProposalId: proposalId, proposedBy: req.user!.userId, payer: counter.payer,
+        amount: counter.amount, instructions: counter.instructions, note: counter.note,
+      }).returning();
+    }
+    await tx.insert(returnAuditEventsTable).values({
+      returnId, actorId: req.user!.userId, action: `shipping_${action === "accept" ? "agreed" : action}`,
+      details: action === "accept"
+        ? { payer: current.payer, amount: current.amount, instructions: current.instructions }
+        : action === "counter" && counter ? { payer: counter.payer, amount: counter.amount, parentProposalId: proposalId }
+        : { proposalId },
+    });
+    if (current.proposedBy !== req.user!.userId) await notifyReturnParticipant(
+      tx, current.proposedBy,
+      action === "accept" ? "Return shipping agreed" : action === "counter" ? "Return shipping counter-proposal" : "Return shipping proposal declined",
+      action === "accept" ? "Shipping terms are agreed. The vendor can now approve the return." : "Review the latest shipping terms in your return conversation.",
+      role === "vendor" ? `/orders/${lockedRequest.orderId}` : "/vendor-dashboard/returns",
+    );
+    return { proposal: nextProposal ?? { ...current, status }, shippingDecision: action === "accept" ? current.payer : lockedRequest.shippingDecision };
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "SHIPPING_CLOSED") { res.status(409).json({ error: "Return shipping terms are already settled or this return is no longer awaiting approval." }); return; }
+    if (error instanceof Error && error.message === "PROPOSAL_UNAVAILABLE") { res.status(409).json({ error: "This proposal is no longer available to respond to." }); return; }
+    throw error;
+  }
+  res.json(result);
+});
+
 router.post("/returns/:id/messages", requireAuth, async (req, res): Promise<void> => {
   const returnId = Number(req.params.id);
   const [request] = await db.select().from(returnsTable).where(eq(returnsTable.id, returnId));
@@ -477,7 +666,17 @@ router.post("/returns/:id/messages", requireAuth, async (req, res): Promise<void
   if (!request || (request.customerId !== req.user!.userId && vendor?.id !== request.vendorId)) { res.status(404).json({ error: "Return not found." }); return; }
   const body = typeof req.body?.body === "string" ? req.body.body.trim().slice(0, 2000) : "";
   if (!body) { res.status(400).json({ error: "Message is required." }); return; }
-  const [message] = await db.insert(returnMessagesTable).values({ returnId, senderId: req.user!.userId, body }).returning();
+  const [message] = await db.transaction(async tx => {
+    const [created] = await tx.insert(returnMessagesTable).values({ returnId, senderId: req.user!.userId, body }).returning();
+    await tx.insert(returnAuditEventsTable).values({ returnId, actorId: req.user!.userId, action: "message_sent", details: {} });
+    const role = await returnParticipantRole(req.user!.userId, request);
+    const destination = role === "vendor" ? request.customerId : (await tx.select().from(vendorsTable).where(eq(vendorsTable.id, request.vendorId)))[0]?.userId;
+    if (destination) await notifyReturnParticipant(
+      tx, destination, "New return message", "You have a new message about an active return.",
+      role === "vendor" ? `/orders/${request.orderId}` : "/vendor-dashboard/returns",
+    );
+    return [created];
+  });
   res.status(201).json(message);
 });
 
