@@ -8,7 +8,6 @@ import {
   useCreateOrder, 
   useValidateCoupon, 
   getGetWardrobeQueryKey,
-  OrderPaymentProcessor
 } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -64,7 +63,8 @@ export default function Checkout() {
   const validateCouponMutation = useValidateCoupon();
 
   const items = wardrobeItems || [];
-  const subtotal = items.reduce((acc, item) => acc + ((item.product?.price || 0) * (item.quantity || 1)), 0);
+  const linePrice = (item: typeof items[number]) => (item.product?.price || 0) + (item.variant?.priceAdjustment || 0);
+  const subtotal = items.reduce((acc, item) => acc + (linePrice(item) * (item.quantity || 1)), 0);
   const total = subtotal - (couponApplied?.discount || 0);
 
   const applyCoupon = () => {
@@ -93,12 +93,18 @@ export default function Checkout() {
       toast({ title: "Wardrobe Empty", description: "Cannot place order with no items.", variant: "destructive" });
       return;
     }
+    const missingVariant = items.find(item => item.product?.variants?.length && !item.variantId);
+    if (missingVariant) {
+      toast({ title: "Choose a variation", description: `Select a size, color, or other variation for ${missingVariant.product?.name} before checkout.`, variant: "destructive" });
+      return;
+    }
 
     createOrderMutation.mutate({
       data: {
         items: items.map(item => ({
           productId: item.productId,
           quantity: item.quantity || 1,
+          variantId: item.variantId || undefined,
           selectedSize: item.selectedSize || undefined
         })),
         shippingAddress: values.shippingAddress,
@@ -269,10 +275,11 @@ export default function Checkout() {
                   <div className="flex-1 text-sm">
                     <p className="font-serif font-medium line-clamp-1">{item.product?.name}</p>
                     <p className="text-muted-foreground text-xs uppercase tracking-widest mb-1">{item.product?.vendor?.brandName}</p>
+                     {item.variant && <p className="text-muted-foreground text-xs mb-1">{Object.entries(item.variant.attributes).map(([key, value]) => `${key}: ${value}`).join(" · ")}</p>}
                     <p className="text-muted-foreground">Qty: {item.quantity}</p>
                   </div>
                   <div className="text-right text-sm">
-                    <p>₦{((item.product?.price || 0) * (item.quantity || 1)).toLocaleString()}</p>
+                     <p>₦{(linePrice(item) * (item.quantity || 1)).toLocaleString()}</p>
                   </div>
                 </div>
               ))}

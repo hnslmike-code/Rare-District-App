@@ -2080,6 +2080,77 @@ export const useRemoveFromWardrobe = <TError = ErrorType<unknown>,
       return useMutation(getRemoveFromWardrobeMutationOptions(options));
     }
 
+export const getRemoveWardrobeItemUrl = (id: number,) => {
+
+
+
+
+  return `/api/wardrobe/items/${id}`
+}
+
+/**
+ * @summary Remove one selected item from the current user's wardrobe
+ */
+export const removeWardrobeItem = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<void> => {
+
+  return customFetch<void>(getRemoveWardrobeItemUrl(id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+
+export const getRemoveWardrobeItemMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeWardrobeItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeWardrobeItem>>, TError,{id: number}, TContext> => {
+
+const mutationKey = ['removeWardrobeItem'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeWardrobeItem>>, {id: number}> = (props) => {
+          const {id} = props ?? {};
+
+          return  removeWardrobeItem(id,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveWardrobeItemMutationResult = NonNullable<Awaited<ReturnType<typeof removeWardrobeItem>>>
+
+    export type RemoveWardrobeItemMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove one selected item from the current user's wardrobe
+ */
+export const useRemoveWardrobeItem = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeWardrobeItem>>, TError,{id: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeWardrobeItem>>,
+        TError,
+        {id: number},
+        TContext
+      > => {
+      return useMutation(getRemoveWardrobeItemMutationOptions(options));
+    }
+
 export const getListOrdersUrl = (params?: ListOrdersParams,) => {
   const normalizedParams = new URLSearchParams();
 

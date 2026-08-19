@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { productsTable } from "./products";
 import { vendorsTable } from "./vendors";
+import { productVariantsTable } from "./vendor-operations";
 
 export const orderStatusEnum = pgEnum("order_status", ["pending", "paid", "processing", "shipped", "delivered", "cancelled"]);
 export const fulfillmentStatusEnum = pgEnum("fulfillment_status", ["pending", "processing", "ready_to_ship", "shipped", "delivered", "cancelled", "returned", "refunded"]);
@@ -32,6 +33,7 @@ export const orderItemsTable = pgTable("order_items", {
   id: serial("id").primaryKey(),
   orderId: serial("order_id").notNull().references(() => ordersTable.id),
   productId: serial("product_id").notNull().references(() => productsTable.id),
+  variantId: integer("variant_id").references(() => productVariantsTable.id),
   vendorId: serial("vendor_id").notNull().references(() => vendorsTable.id),
   quantity: integer("quantity").notNull(),
   selectedSize: text("selected_size"),

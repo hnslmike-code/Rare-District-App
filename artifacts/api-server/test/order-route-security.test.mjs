@@ -77,7 +77,7 @@ if (!databaseUrl) {
 } else {
   test("order routes isolate mixed-vendor data and enforce ownership boundaries", async () => {
     const pool = new Pool({ connectionString: databaseUrl });
-    const created = { users: [], vendors: [], products: [], orders: [], orderItems: [], transactions: [], payouts: [] };
+    const created = { users: [], vendors: [], products: [], variants: [], orders: [], orderItems: [], transactions: [], payouts: [] };
     const serverOutput = [];
     const server = spawn(process.execPath, ["--import", paymentProviderMock, "--enable-source-maps", "./dist/index.mjs"], {
       cwd: resolve(import.meta.dirname, ".."),
@@ -135,12 +135,12 @@ if (!databaseUrl) {
       return order;
     }
 
-    async function checkout(user, productId, quantity = 1) {
+    async function checkout(user, productId, quantity = 1, variantId) {
       const response = await fetch(`${apiUrl}/orders`, {
         method: "POST",
         headers: auth(user),
         body: JSON.stringify({
-          items: [{ productId, quantity }],
+          items: [{ productId, quantity, ...(variantId ? { variantId } : {}) }],
           shippingAddress: "1 Regression Road",
           shippingCity: "Lagos",
           shippingState: "Lagos",
@@ -213,12 +213,25 @@ if (!databaseUrl) {
         `INSERT INTO products (vendor_id, name, price, stock) VALUES
           ($1, $2, 1000, 5),
            ($3, $4, 2000, 5),
-           ($1, $5, 1000, 1)
+           ($1, $5, 1000, 1),
+           ($1, $6, 1000, 5)
         RETURNING id`,
-        [vendorA.id, `A Product ${suffix}`, vendorB.id, `B Product ${suffix}`, `Limited Product ${suffix}`],
+        [vendorA.id, `A Product ${suffix}`, vendorB.id, `B Product ${suffix}`, `Limited Product ${suffix}`, `Variant Product ${suffix}`],
       );
-      const [productA, productB, limitedProduct] = productResult.rows;
+      const [productA, productB, limitedProduct, variantProduct] = productResult.rows;
       created.products.push(...productResult.rows.map(product => product.id));
+      const variantResult = await query(
+        `INSERT INTO product_variants (product_id, sku, attributes, stock) VALUES
+          ($1, $2, $3::jsonb, 2),
+          ($1, $4, $5::jsonb, 3)
+        RETURNING id, sku`,
+        [
+          variantProduct.id, `RD-BLK-M-${suffix}`, JSON.stringify({ Size: "M", Color: "Black", Material: "Cotton" }),
+          `RD-RED-L-${suffix}`, JSON.stringify({ Size: "L", Color: "Red", Material: "Linen" }),
+        ],
+      );
+      const [blackMedium, redLarge] = variantResult.rows;
+      created.variants.push(...variantResult.rows.map(variant => variant.id));
 
       const mixedOrderId = await createOrder(buyer.id, "paid", [
         { productId: productA.id, vendorId: vendorA.id, unitPrice: 1000 },
@@ -399,6 +412,70 @@ if (!databaseUrl) {
       });
       assert.equal(paymentOwnershipResponse.status, 404);
 
+      const { response: mixedVariantResponse, payload: mixedVariantOrder } = await checkout(buyer, variantProduct.id, 1, blackMedium.id);
+      assert.equal(mixedVariantResponse.status, 201);
+      const secondVariantOrderResponse = await fetch(`${apiUrl}/orders`, {
+        method: "POST",
+        headers: auth(buyer),
+        body: JSON.stringify({
+          items: [
+            { productId: variantProduct.id, variantId: blackMedium.id, quantity: 1 },
+            { productId: variantProduct.id, variantId: redLarge.id, quantity: 2 },
+          ],
+          shippingAddress: "1 Regression Road",
+          shippingCity: "Lagos",
+          shippingState: "Lagos",
+          shippingPhone: "08000000000",
+        }),
+      });
+      assert.equal(secondVariantOrderResponse.status, 201);
+      const secondVariantOrder = trackOrder(await secondVariantOrderResponse.json());
+      trackOrder(mixedVariantOrder);
+      assert.deepEqual(secondVariantOrder.items.map(item => item.variantId).sort((left, right) => left - right), [blackMedium.id, redLarge.id].sort((left, right) => left - right));
+      const variantReservationState = await query(
+        "SELECT id, stock, reserved_stock FROM product_variants WHERE id = ANY($1::int[]) ORDER BY id",
+        [[blackMedium.id, redLarge.id]],
+      );
+      assert.deepEqual(variantReservationState.rows.map(row => ({ id: row.id, stock: row.stock, reserved: row.reserved_stock })), [
+        { id: blackMedium.id, stock: 2, reserved: 2 },
+        { id: redLarge.id, stock: 3, reserved: 2 },
+      ].sort((left, right) => left.id - right.id));
+      assert.equal(await stockFor(variantProduct.id), 5);
+      const mixedVariantCancellation = await fetch(`${apiUrl}/orders/${secondVariantOrder.id}/status`, {
+        method: "PATCH",
+        headers: auth(buyer),
+        body: JSON.stringify({ status: "cancelled" }),
+      });
+      assert.equal(mixedVariantCancellation.status, 200);
+      const releasedVariantState = await query(
+        "SELECT id, stock, reserved_stock FROM product_variants WHERE id = ANY($1::int[]) ORDER BY id",
+        [[blackMedium.id, redLarge.id]],
+      );
+      assert.deepEqual(releasedVariantState.rows.map(row => ({ id: row.id, stock: row.stock, reserved: row.reserved_stock })), [
+        { id: blackMedium.id, stock: 2, reserved: 1 },
+        { id: redLarge.id, stock: 3, reserved: 0 },
+      ].sort((left, right) => left.id - right.id));
+
+      const { response: expiringVariantResponse, payload: expiringVariantOrder } = await checkout(buyer, variantProduct.id, 1, blackMedium.id);
+      assert.equal(expiringVariantResponse.status, 201);
+      trackOrder(expiringVariantOrder);
+      await query(
+        "UPDATE inventory_reservations SET expires_at = now() - interval '1 minute' WHERE order_id = $1",
+        [expiringVariantOrder.id],
+      );
+      const expiryTrigger = await checkout(buyer, productB.id);
+      assert.equal(expiryTrigger.response.status, 201);
+      trackOrder(expiryTrigger.payload);
+      const expiredReservation = await query(
+        "SELECT status FROM inventory_reservations WHERE order_id = $1",
+        [expiringVariantOrder.id],
+      );
+      assert.equal(expiredReservation.rows[0].status, "expired");
+      const expiredOrder = await query("SELECT status FROM orders WHERE id = $1", [expiringVariantOrder.id]);
+      assert.equal(expiredOrder.rows[0].status, "cancelled");
+      const blackAfterExpiry = await query("SELECT stock, reserved_stock FROM product_variants WHERE id = $1", [blackMedium.id]);
+      assert.deepEqual(blackAfterExpiry.rows[0], { stock: 2, reserved_stock: 1 });
+
       const concurrentReservations = await Promise.all([
         checkout(buyer, limitedProduct.id),
         checkout(buyer, limitedProduct.id),
@@ -536,11 +613,14 @@ if (!databaseUrl) {
     } finally {
       try {
         if (created.vendors.length) await query("DELETE FROM admin_audit_logs WHERE entity_type = 'vendor' AND entity_id = ANY($1::text[])", [created.vendors.map(String)]);
+        if (created.users.length) await query("DELETE FROM notifications WHERE user_id = ANY($1::int[])", [created.users]);
         if (created.payouts.length) await query("DELETE FROM payout_records WHERE id = ANY($1::int[])", [created.payouts]);
         if (created.orders.length) await query("DELETE FROM transactions WHERE order_id = ANY($1::int[])", [created.orders]);
         if (created.transactions.length) await query("DELETE FROM transactions WHERE id = ANY($1::int[])", [created.transactions]);
+        if (created.orders.length) await query("DELETE FROM inventory_reservations WHERE order_id = ANY($1::int[])", [created.orders]);
         if (created.orderItems.length) await query("DELETE FROM order_items WHERE id = ANY($1::int[])", [created.orderItems]);
         if (created.orders.length) await query("DELETE FROM orders WHERE id = ANY($1::int[])", [created.orders]);
+        if (created.variants.length) await query("DELETE FROM product_variants WHERE id = ANY($1::int[])", [created.variants]);
         if (created.products.length) await query("DELETE FROM products WHERE id = ANY($1::int[])", [created.products]);
         if (created.vendors.length) await query("DELETE FROM vendors WHERE id = ANY($1::int[])", [created.vendors]);
         if (created.users.length) await query("DELETE FROM users WHERE id = ANY($1::int[])", [created.users]);

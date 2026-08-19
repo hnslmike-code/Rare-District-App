@@ -5,6 +5,7 @@
  * Rare District — Nigerian fashion marketplace API
  * OpenAPI spec version: 0.1.0
  */
+import type { ProductVariant } from './productVariant';
 import type { Vendor } from './vendor';
 
 export interface Product {
@@ -26,6 +27,7 @@ export interface Product {
   /** @nullable */
   averageRating?: number | null;
   reviewCount?: number;
+  variants?: ProductVariant[];
   createdAt: Date;
   vendor?: Vendor;
 }

@@ -6,11 +6,14 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Product } from './product';
+import type { ProductVariant } from './productVariant';
 
 export interface OrderItem {
   id: number;
   orderId: number;
   productId: number;
+  /** @nullable */
+  variantId?: number | null;
   vendorId: number;
   quantity: number;
   /** @nullable */
@@ -20,4 +23,5 @@ export interface OrderItem {
   commissionAmount: number;
   vendorAmount: number;
   product?: Product;
+  variant?: ProductVariant;
 }

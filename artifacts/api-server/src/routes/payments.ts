@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, and, sql } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, transactionsTable, inventoryReservationTable } from "@workspace/db";
+import { eq, and, gte, sql } from "drizzle-orm";
+import { db, ordersTable, orderItemsTable, productsTable, productVariantsTable, transactionsTable, inventoryReservationTable } from "@workspace/db";
 import { InitiatePaystackPaymentBody, InitiateFlutterwavePaymentBody, VerifyPaystackPaymentBody, VerifyFlutterwavePaymentBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { releaseOrderInventory, recordOrderItemLedgerEntry } from "./orders";
@@ -27,6 +27,28 @@ async function settlePaidOrder(order: typeof ordersTable.$inferSelect, processor
     )).limit(1);
     if (existing) return false;
 
+    const reservations = await tx.select().from(inventoryReservationTable).where(and(
+      eq(inventoryReservationTable.orderId, order.id),
+      eq(inventoryReservationTable.status, "active"),
+    ));
+    for (const reservation of reservations) {
+      if (!reservation.variantId) continue;
+      const [consumed] = await tx.update(productVariantsTable)
+        .set({
+          stock: sql`${productVariantsTable.stock} - ${reservation.quantity}`,
+          reservedStock: sql`${productVariantsTable.reservedStock} - ${reservation.quantity}`,
+        })
+        .where(and(
+          eq(productVariantsTable.id, reservation.variantId),
+          gte(productVariantsTable.stock, reservation.quantity),
+          gte(productVariantsTable.reservedStock, reservation.quantity),
+        ))
+        .returning({ id: productVariantsTable.id });
+      if (!consumed) throw new Error("Reserved variant inventory is no longer available.");
+      await tx.update(productsTable)
+        .set({ stock: sql`${productsTable.stock} - ${reservation.quantity}` })
+        .where(eq(productsTable.id, reservation.productId));
+    }
     await tx.update(ordersTable).set({ status: "paid" }).where(eq(ordersTable.id, order.id));
     await tx.update(inventoryReservationTable).set({ status: "consumed" }).where(and(
       eq(inventoryReservationTable.orderId, order.id),

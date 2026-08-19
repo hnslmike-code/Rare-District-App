@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql, and, inArray } from "drizzle-orm";
-import { db, vendorsTable, usersTable, productsTable, ordersTable, orderItemsTable, transactionsTable, payoutRecordsTable, vendorJoinPageConfigsTable } from "@workspace/db";
+import { eq, desc, gte, sql, and, inArray } from "drizzle-orm";
+import { db, vendorsTable, usersTable, productsTable, productVariantsTable, ordersTable, orderItemsTable, transactionsTable, payoutRecordsTable, vendorJoinPageConfigsTable, inventoryReservationTable } from "@workspace/db";
 import { ApplyAsVendorBody, UpdateMyVendorProfileBody, GetVendorParams, GetVendorRecentOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { defaultVendorJoinPageContent, normalizeVendorJoinPageContent } from "../lib/vendor-join-content";
@@ -377,9 +377,37 @@ router.patch("/vendors/orders/:orderId/items/:itemId/fulfillment", requireAuth, 
       const shouldRestoreInventory = status === "cancelled" || status === "returned" ||
         (status === "refunded" && lockedItem.fulfillmentStatus !== "returned");
       if (shouldRestoreInventory) {
-        await tx.update(productsTable)
-          .set({ stock: sql`${productsTable.stock} + ${lockedItem.quantity}` })
-          .where(eq(productsTable.id, lockedItem.productId));
+        const reservations = await tx.select().from(inventoryReservationTable).where(and(
+          eq(inventoryReservationTable.orderId, lockedItem.orderId),
+          eq(inventoryReservationTable.orderItemId, lockedItem.id),
+          inArray(inventoryReservationTable.status, ["active", "consumed"]),
+        ));
+        if (lockedItem.variantId) {
+          for (const reservation of reservations) {
+            if (reservation.status === "active") {
+              await tx.update(productVariantsTable)
+                .set({ reservedStock: sql`${productVariantsTable.reservedStock} - ${reservation.quantity}` })
+                .where(and(eq(productVariantsTable.id, lockedItem.variantId), gte(productVariantsTable.reservedStock, reservation.quantity)));
+            } else {
+              await tx.update(productVariantsTable)
+                .set({ stock: sql`${productVariantsTable.stock} + ${reservation.quantity}` })
+                .where(eq(productVariantsTable.id, lockedItem.variantId));
+              await tx.update(productsTable)
+                .set({ stock: sql`${productsTable.stock} + ${reservation.quantity}` })
+                .where(eq(productsTable.id, lockedItem.productId));
+            }
+            await tx.update(inventoryReservationTable).set({ status: "released", releasedAt: new Date() })
+              .where(eq(inventoryReservationTable.id, reservation.id));
+          }
+        } else {
+          await tx.update(productsTable)
+            .set({ stock: sql`${productsTable.stock} + ${lockedItem.quantity}` })
+            .where(eq(productsTable.id, lockedItem.productId));
+          if (reservations.length) {
+            await tx.update(inventoryReservationTable).set({ status: "released", releasedAt: new Date() })
+              .where(inArray(inventoryReservationTable.id, reservations.map(reservation => reservation.id)));
+          }
+        }
       }
       if (status === "cancelled" || status === "returned" || status === "refunded") {
         await recordOrderItemLedgerEntry(tx, lockedOrder, lockedItem, status === "cancelled" ? "reversal" : "refund");

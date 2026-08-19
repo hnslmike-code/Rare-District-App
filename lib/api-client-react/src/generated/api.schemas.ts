@@ -267,6 +267,21 @@ export type VendorDashboardMonthlySalesItem = {
   orders: number;
 };
 
+export type ProductVariantAttributes = {[key: string]: string};
+
+export interface ProductVariant {
+  id: number;
+  productId: number;
+  sku: string;
+  attributes: ProductVariantAttributes;
+  priceAdjustment: number;
+  stock: number;
+  reservedStock: number;
+  availableStock: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
 export interface Product {
   id: number;
   vendorId: number;
@@ -286,6 +301,7 @@ export interface Product {
   /** @nullable */
   averageRating?: number | null;
   reviewCount?: number;
+  variants?: ProductVariant[];
   createdAt: string;
   vendor?: Vendor;
 }
@@ -353,14 +369,18 @@ export interface WardrobeItem {
   userId: number;
   productId: number;
   /** @nullable */
+  variantId?: number | null;
+  /** @nullable */
   selectedSize?: string | null;
   quantity?: number;
   addedAt: string;
   product?: Product;
+  variant?: ProductVariant;
 }
 
 export interface WardrobeInput {
   productId: number;
+  variantId?: number;
   selectedSize?: string;
   quantity?: number;
 }
@@ -392,6 +412,8 @@ export interface OrderItem {
   id: number;
   orderId: number;
   productId: number;
+  /** @nullable */
+  variantId?: number | null;
   vendorId: number;
   quantity: number;
   /** @nullable */
@@ -401,6 +423,7 @@ export interface OrderItem {
   commissionAmount: number;
   vendorAmount: number;
   product?: Product;
+  variant?: ProductVariant;
 }
 
 export interface Order {
@@ -426,6 +449,7 @@ export interface Order {
 
 export type OrderInputItemsItem = {
   productId: number;
+  variantId?: number;
   /** @minimum 1 */
   quantity: number;
   selectedSize?: string;

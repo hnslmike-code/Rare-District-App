@@ -2,3 +2,4 @@
 - [API security test runner](api-security-test-runner.md) — policy tests import TypeScript source with Node type stripping, not the bundled API output.
 - [Admin vendor data boundaries](admin-vendor-data-boundaries.md) — vendor operations responses must use explicit redacted shapes, not generic vendor/product contracts.
 - [Financial ledger reconciliation](financial-ledger-reconciliation.md) — financial lifecycle flows share order-then-item locks and one signed ledger offset per item.
+- [Variant inventory lifecycle](variant-inventory-lifecycle.md) — variant checkout holds use reserved stock; aggregate product stock changes only when physical variant stock changes.

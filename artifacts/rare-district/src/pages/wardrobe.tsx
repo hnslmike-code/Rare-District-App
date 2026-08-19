@@ -1,5 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useGetWardrobe, useRemoveFromWardrobe, getGetWardrobeQueryKey } from "@workspace/api-client-react";
+import { useGetWardrobe, useRemoveWardrobeItem, getGetWardrobeQueryKey } from "@workspace/api-client-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Trash2, ArrowRight } from "lucide-react";
@@ -18,10 +18,10 @@ export default function Wardrobe() {
     }
   });
 
-  const removeMutation = useRemoveFromWardrobe();
+  const removeMutation = useRemoveWardrobeItem();
 
-  const handleRemove = (productId: number) => {
-    removeMutation.mutate({ productId }, {
+  const handleRemove = (itemId: number) => {
+    removeMutation.mutate({ id: itemId }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getGetWardrobeQueryKey() });
         toast({ title: "Removed from wardrobe" });
@@ -52,7 +52,8 @@ export default function Wardrobe() {
   }
 
   const items = wardrobeItems || [];
-  const subtotal = items.reduce((acc, item) => acc + ((item.product?.price || 0) * (item.quantity || 1)), 0);
+  const linePrice = (item: typeof items[number]) => (item.product?.price || 0) + (item.variant?.priceAdjustment || 0);
+  const subtotal = items.reduce((acc, item) => acc + (linePrice(item) * (item.quantity || 1)), 0);
 
   if (items.length === 0) {
     return (
@@ -101,13 +102,16 @@ export default function Wardrobe() {
                       {item.selectedSize && (
                         <p className="text-sm text-muted-foreground mb-2"><span className="font-medium text-foreground">Size:</span> {item.selectedSize}</p>
                       )}
+                      {item.variant && (
+                        <p className="text-sm text-muted-foreground mb-2">{Object.entries(item.variant.attributes).map(([key, value]) => <span key={key} className="mr-2"><span className="font-medium text-foreground">{key}:</span> {value}</span>)}</p>
+                      )}
                       <p className="text-sm text-muted-foreground"><span className="font-medium text-foreground">Qty:</span> {item.quantity}</p>
                     </div>
                     
                     <div className="text-right">
-                      <p className="text-lg font-light mb-4">{item.product?.currency} {((item.product?.price || 0) * (item.quantity || 1)).toLocaleString()}</p>
+                      <p className="text-lg font-light mb-4">{item.product?.currency} {(linePrice(item) * (item.quantity || 1)).toLocaleString()}</p>
                       <button 
-                        onClick={() => handleRemove(item.productId)}
+                        onClick={() => handleRemove(item.id)}
                         className="text-muted-foreground hover:text-destructive transition-colors p-2 -mr-2"
                         title="Remove"
                       >

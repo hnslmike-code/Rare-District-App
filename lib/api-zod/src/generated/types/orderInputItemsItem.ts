@@ -8,6 +8,7 @@
 
 export type OrderInputItemsItem = {
   productId: number;
+  variantId?: number;
   /** @minimum 1 */
   quantity: number;
   selectedSize?: string;

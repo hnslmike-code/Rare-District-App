@@ -597,6 +597,21 @@ paths:
         "204":
           description: Removed
 
+  /wardrobe/items/{id}:
+    delete:
+      operationId: removeWardrobeItem
+      tags: [Wardrobe]
+      summary: Remove one selected item from the current user's wardrobe
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+
   # ── ORDERS ────────────────────────────────────────────────────────────────
   /orders:
     get:
@@ -1796,6 +1811,10 @@ components:
           type: ["number", "null"]
         reviewCount:
           type: integer
+        variants:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProductVariant"
         createdAt:
           type: string
           format: date-time
@@ -1871,6 +1890,34 @@ components:
         limit:
           type: integer
 
+    ProductVariant:
+      type: object
+      required: [id, productId, sku, attributes, priceAdjustment, stock, reservedStock, availableStock, isActive, createdAt]
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        sku:
+          type: string
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+        priceAdjustment:
+          type: number
+        stock:
+          type: integer
+        reservedStock:
+          type: integer
+        availableStock:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
     # ── Category ─────────────────────────────────────────────────────────────
     Category:
       type: object
@@ -1909,6 +1956,8 @@ components:
           type: integer
         productId:
           type: integer
+        variantId:
+          type: ["integer", "null"]
         selectedSize:
           type: ["string", "null"]
         quantity:
@@ -1918,12 +1967,16 @@ components:
           format: date-time
         product:
           $ref: "#/components/schemas/Product"
+        variant:
+          $ref: "#/components/schemas/ProductVariant"
 
     WardrobeInput:
       type: object
       required: [productId]
       properties:
         productId:
+          type: integer
+        variantId:
           type: integer
         selectedSize:
           type: string
@@ -1983,6 +2036,8 @@ components:
           type: integer
         productId:
           type: integer
+        variantId:
+          type: ["integer", "null"]
         vendorId:
           type: integer
         quantity:
@@ -1999,6 +2054,8 @@ components:
           type: number
         product:
           $ref: "#/components/schemas/Product"
+        variant:
+          $ref: "#/components/schemas/ProductVariant"
 
     OrderInput:
       type: object
@@ -2012,6 +2069,8 @@ components:
             required: [productId, quantity]
             properties:
               productId:
+                type: integer
+              variantId:
                 type: integer
               quantity:
                 type: integer

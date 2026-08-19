@@ -18,6 +18,7 @@ export default function ProductDetail() {
   const queryClient = useQueryClient();
 
   const [selectedSize, setSelectedSize] = useState<string>("");
+  const [selectedAttributes, setSelectedAttributes] = useState<Record<string, string>>({});
   const [activeImage, setActiveImage] = useState<number>(0);
   const [height, setHeight] = useState("");
   const [usualSize, setUsualSize] = useState("");
@@ -51,7 +52,17 @@ export default function ProductDetail() {
       return;
     }
     
-    if (product.sizes && product.sizes.length > 0 && !selectedSize) {
+    const variants = product.variants ?? [];
+    if (variants.length > 0 && !selectedVariant) {
+      toast({
+        title: "Select a Variation",
+        description: "Choose every available option before adding this piece to your wardrobe.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (variants.length === 0 && product.sizes && product.sizes.length > 0 && !selectedSize) {
       toast({
         title: "Select a Size",
         description: "Please select a size before adding to your wardrobe.",
@@ -63,6 +74,7 @@ export default function ProductDetail() {
     addToWardrobe.mutate({
       data: {
         productId: product.id,
+          variantId: selectedVariant?.id,
         selectedSize: selectedSize || undefined,
         quantity: 1
       }
@@ -112,6 +124,26 @@ export default function ProductDetail() {
   }
 
   const hasSizes = product.sizes && product.sizes.length > 0;
+  const variants = product.variants ?? [];
+  const hasVariantInventory = variants.length > 0;
+  const attributeNames = [...new Set(variants.flatMap((variant) => Object.keys(variant.attributes)))];
+  const matchingVariants = variants.filter((variant) =>
+    Object.entries(selectedAttributes).every(([key, value]) => variant.attributes[key] === value),
+  );
+  const selectedVariant = attributeNames.length > 0 && attributeNames.every((key) => selectedAttributes[key])
+    ? matchingVariants.find((variant) => variant.availableStock > 0)
+    : undefined;
+  const displayPrice = product.price + (selectedVariant?.priceAdjustment ?? 0);
+  const optionIsAvailable = (attribute: string, value: string) => variants.some((variant) =>
+    variant.availableStock > 0 &&
+    variant.attributes[attribute] === value &&
+    Object.entries(selectedAttributes).every(([selectedAttribute, selectedValue]) =>
+      selectedAttribute === attribute || variant.attributes[selectedAttribute] === selectedValue,
+    ),
+  );
+  const chooseAttribute = (attribute: string, value: string) => {
+    setSelectedAttributes((previous) => ({ ...previous, [attribute]: value }));
+  };
   const fitRecommendation = (() => {
     if (!product.sizes?.length || !usualSize) return "";
     const sizes = product.sizes;
@@ -174,10 +206,51 @@ export default function ProductDetail() {
             
             <h1 className="font-serif text-4xl lg:text-5xl font-bold tracking-tight mb-4 leading-tight">{product.name}</h1>
             
-            <p className="text-2xl font-light mb-8">{product.currency} {product.price.toLocaleString()}</p>
+            <p className="text-2xl font-light mb-8">{product.currency} {displayPrice.toLocaleString()}</p>
             
-            {/* Sizes */}
-            {hasSizes && (
+            {/* Variant combinations */}
+            {hasVariantInventory && (
+              <div className="mb-10 space-y-7" data-testid="product-variant-selector">
+                {attributeNames.map((attribute) => {
+                  const values = [...new Set(variants.map((variant) => variant.attributes[attribute]).filter(Boolean))];
+                  return (
+                    <div key={attribute}>
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Select {attribute}</span>
+                        {selectedAttributes[attribute] && <span className="text-xs text-muted-foreground">{selectedAttributes[attribute]}</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-3">
+                        {values.map((value) => {
+                          const available = optionIsAvailable(attribute, value);
+                          const selected = selectedAttributes[attribute] === value;
+                          return <button
+                            key={value}
+                            type="button"
+                            onClick={() => chooseAttribute(attribute, value)}
+                            disabled={!available}
+                            className={`min-w-14 border px-4 py-3 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-35 ${
+                              selected
+                                ? "border-foreground bg-foreground text-background"
+                                : "border-border bg-background text-foreground hover:border-foreground"
+                            }`}
+                          >
+                            {value}
+                          </button>;
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+                <p className={`text-xs ${selectedVariant ? "text-muted-foreground" : "text-primary"}`}>
+                  {selectedVariant
+                    ? `${selectedVariant.availableStock} available · ${selectedVariant.sku}`
+                    : `Choose ${attributeNames.filter((attribute) => !selectedAttributes[attribute]).join(", ")} to see availability.`}
+                </p>
+              </div>
+            )}
+
+            {/* Legacy sizes */}
+            {!hasVariantInventory && hasSizes && (
               <div className="mb-10">
                 <div className="flex justify-between items-end mb-4">
                   <span className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Select Size</span>
@@ -225,7 +298,7 @@ export default function ProductDetail() {
               </div>
             )}
 
-            {hasSizes && (
+            {!hasVariantInventory && hasSizes && (
               <section className="mb-10 border border-border p-5" aria-labelledby="fit-predictor-title" data-testid="fit-predictor">
                 <div className="flex items-start justify-between gap-4 mb-5">
                   <div>
@@ -247,10 +320,18 @@ export default function ProductDetail() {
             <div className="space-y-4 mb-12">
               <Button 
                 onClick={handleAddToCart}
-                disabled={product.stock === 0 || addToWardrobe.isPending}
+                disabled={(hasVariantInventory ? !selectedVariant : product.stock === 0) || addToWardrobe.isPending}
                 className="w-full h-14 rounded-none font-bold tracking-widest uppercase text-sm"
               >
-                {addToWardrobe.isPending ? "Adding..." : product.stock === 0 ? "Sold Out" : "Add to Wardrobe"}
+                {addToWardrobe.isPending
+                  ? "Adding..."
+                  : hasVariantInventory
+                    ? !selectedVariant
+                      ? "Select Variation"
+                      : "Add to Wardrobe"
+                    : product.stock === 0
+                      ? "Sold Out"
+                      : "Add to Wardrobe"}
               </Button>
               <div className="grid grid-cols-2 gap-4">
                 <Button variant="outline" className="h-12 rounded-none border-border font-medium tracking-widest uppercase text-xs hover:bg-secondary">

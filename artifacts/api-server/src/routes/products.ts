@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, asc, gte, lte, ilike, and, sql } from "drizzle-orm";
-import { db, productsTable, vendorsTable, usersTable, reviewsTable } from "@workspace/db";
+import { db, productsTable, productVariantsTable, vendorsTable, usersTable, reviewsTable } from "@workspace/db";
 import {
   ListProductsQueryParams, CreateProductBody, GetProductParams,
   UpdateProductParams, UpdateProductBody, DeleteProductParams,
@@ -15,6 +15,10 @@ const router: IRouter = Router();
 async function buildProductResponse(p: typeof productsTable.$inferSelect, vendorMap?: Map<number, typeof vendorsTable.$inferSelect>, userMap?: Map<number, typeof usersTable.$inferSelect>) {
   const vendor = vendorMap?.get(p.vendorId);
   const reviewRows = await db.select().from(reviewsTable).where(eq(reviewsTable.productId, p.id));
+  const variants = await db.select().from(productVariantsTable).where(and(
+    eq(productVariantsTable.productId, p.id),
+    eq(productVariantsTable.isActive, true),
+  ));
   const avgRating = reviewRows.length > 0 ? reviewRows.reduce((s, r) => s + r.rating, 0) / reviewRows.length : null;
   const user = vendor ? userMap?.get(vendor.userId) : undefined;
   return {
@@ -24,6 +28,11 @@ async function buildProductResponse(p: typeof productsTable.$inferSelect, vendor
     isFeatured: p.isFeatured, wardrobeCount: p.wardrobeCount,
     averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
     reviewCount: reviewRows.length, createdAt: p.createdAt,
+    variants: variants.map((variant) => ({
+      id: variant.id, productId: variant.productId, sku: variant.sku, attributes: variant.attributes,
+      priceAdjustment: Number(variant.priceAdjustment), stock: variant.stock, reservedStock: variant.reservedStock,
+      availableStock: variant.stock - variant.reservedStock, isActive: variant.isActive, createdAt: variant.createdAt,
+    })),
     vendor: vendor ? formatPublicVendor(vendor) : undefined,
   };
 }

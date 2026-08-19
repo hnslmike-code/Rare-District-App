@@ -6,9 +6,4 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface WardrobeInput {
-  productId: number;
-  variantId?: number;
-  selectedSize?: string;
-  quantity?: number;
-}
+export type ProductVariantAttributes = {[key: string]: string};

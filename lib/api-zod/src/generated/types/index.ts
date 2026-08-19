@@ -74,6 +74,8 @@ export * from './product';
 export * from './productInput';
 export * from './productPage';
 export * from './productUpdate';
+export * from './productVariant';
+export * from './productVariantAttributes';
 export * from './publishPageRequest';
 export * from './publishPageRequestMode';
 export * from './referralStats';

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, gte, inArray, sql } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, productsTable, vendorsTable, transactionsTable, adminSettingsTable, inventoryReservationTable } from "@workspace/db";
+import { db, ordersTable, orderItemsTable, productsTable, productVariantsTable, vendorsTable, transactionsTable, adminSettingsTable, inventoryReservationTable } from "@workspace/db";
 import { CreateOrderBody, GetOrderParams, UpdateOrderStatusParams, UpdateOrderStatusBody, ListOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import {
@@ -103,9 +103,31 @@ export async function releaseOrderInventory(orderId: number, status: "cancelled"
     for (const item of items) {
       const inventoryAlreadyRestored = ["cancelled", "returned", "refunded"].includes(item.fulfillmentStatus);
       if (!order.inventoryReleasedAt && !inventoryAlreadyRestored) {
-        await tx.update(productsTable)
-          .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
-          .where(eq(productsTable.id, item.productId));
+        const reservations = await tx.select().from(inventoryReservationTable).where(and(
+          eq(inventoryReservationTable.orderId, orderId),
+          eq(inventoryReservationTable.orderItemId, item.id),
+        ));
+        for (const reservation of reservations) {
+          if (reservation.status === "released" || reservation.status === "expired") continue;
+          if (reservation.variantId) {
+            if (reservation.status === "active") {
+              await tx.update(productVariantsTable)
+                .set({ reservedStock: sql`${productVariantsTable.reservedStock} - ${reservation.quantity}` })
+                .where(and(eq(productVariantsTable.id, reservation.variantId), gte(productVariantsTable.reservedStock, reservation.quantity)));
+            } else if (reservation.status === "consumed") {
+              await tx.update(productVariantsTable)
+                .set({ stock: sql`${productVariantsTable.stock} + ${reservation.quantity}` })
+                .where(eq(productVariantsTable.id, reservation.variantId));
+              await tx.update(productsTable)
+                .set({ stock: sql`${productsTable.stock} + ${reservation.quantity}` })
+                .where(eq(productsTable.id, reservation.productId));
+            }
+          } else {
+            await tx.update(productsTable)
+              .set({ stock: sql`${productsTable.stock} + ${reservation.quantity}` })
+              .where(eq(productsTable.id, reservation.productId));
+          }
+        }
         await tx.update(orderItemsTable)
           .set({ fulfillmentStatus: "cancelled" })
           .where(eq(orderItemsTable.id, item.id));
@@ -118,7 +140,7 @@ export async function releaseOrderInventory(orderId: number, status: "cancelled"
     }
     await tx.update(inventoryReservationTable).set({ status: "released", releasedAt: new Date() }).where(and(
       eq(inventoryReservationTable.orderId, orderId),
-      eq(inventoryReservationTable.status, "active"),
+      inArray(inventoryReservationTable.status, ["active", "consumed"]),
     ));
     const [updated] = await tx.update(ordersTable)
       .set({ status, inventoryReleasedAt: order.inventoryReleasedAt ?? new Date() })
@@ -141,8 +163,15 @@ export async function expireInventoryReservations() {
         eq(inventoryReservationTable.status, "active"),
       ));
       if (!stillActive) continue;
-      await tx.update(productsTable).set({ stock: sql`${productsTable.stock} + ${reservation.quantity}` }).where(eq(productsTable.id, reservation.productId));
+      if (reservation.variantId) {
+        await tx.update(productVariantsTable)
+          .set({ reservedStock: sql`${productVariantsTable.reservedStock} - ${reservation.quantity}` })
+          .where(and(eq(productVariantsTable.id, reservation.variantId), gte(productVariantsTable.reservedStock, reservation.quantity)));
+      } else {
+        await tx.update(productsTable).set({ stock: sql`${productsTable.stock} + ${reservation.quantity}` }).where(eq(productsTable.id, reservation.productId));
+      }
       await tx.update(inventoryReservationTable).set({ status: "expired", releasedAt: new Date() }).where(eq(inventoryReservationTable.id, reservation.id));
+      await tx.update(orderItemsTable).set({ fulfillmentStatus: "cancelled" }).where(eq(orderItemsTable.id, reservation.orderItemId));
       await tx.update(ordersTable).set({ status: "cancelled", inventoryReleasedAt: new Date() }).where(and(eq(ordersTable.id, reservation.orderId), eq(ordersTable.status, "pending")));
     }
     return expired.length;
@@ -153,8 +182,11 @@ async function formatOrder(order: typeof ordersTable.$inferSelect) {
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
   const formattedItems = await Promise.all(items.map(async (item) => {
     const [product] = await db.select().from(productsTable).where(eq(productsTable.id, item.productId));
+    const [variant] = item.variantId
+      ? await db.select().from(productVariantsTable).where(eq(productVariantsTable.id, item.variantId))
+      : [undefined];
     return {
-      id: item.id, orderId: item.orderId, productId: item.productId, vendorId: item.vendorId,
+      id: item.id, orderId: item.orderId, productId: item.productId, variantId: item.variantId, vendorId: item.vendorId,
       quantity: item.quantity, selectedSize: item.selectedSize,
       unitPrice: parseFloat(item.unitPrice), commissionRate: parseFloat(item.commissionRate),
       commissionAmount: parseFloat(item.commissionAmount), vendorAmount: parseFloat(item.vendorAmount),
@@ -164,6 +196,11 @@ async function formatOrder(order: typeof ordersTable.$inferSelect) {
         sizes: product.sizes, images: product.images, stock: product.stock, isActive: product.isActive,
         isFeatured: product.isFeatured, wardrobeCount: product.wardrobeCount,
         averageRating: null, reviewCount: 0, createdAt: product.createdAt,
+      } : undefined,
+      variant: variant ? {
+        id: variant.id, productId: variant.productId, sku: variant.sku, attributes: variant.attributes,
+        priceAdjustment: Number(variant.priceAdjustment), stock: variant.stock, reservedStock: variant.reservedStock,
+        availableStock: variant.stock - variant.reservedStock, isActive: variant.isActive, createdAt: variant.createdAt,
       } : undefined,
     };
   }));
@@ -208,26 +245,53 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
       const settings = await tx.select().from(adminSettingsTable).limit(1);
       const commissionRate = settings[0] ? parseFloat(settings[0].defaultCommissionRate) : 5;
       let totalAmount = 0;
-      const orderItems: Array<{ productId: number; vendorId: number; quantity: number; selectedSize?: string; unitPrice: number; commissionRate: number; commissionAmount: number; vendorAmount: number }> = [];
+      const orderItems: Array<{ productId: number; variantId?: number; vendorId: number; quantity: number; selectedSize?: string; unitPrice: number; commissionRate: number; commissionAmount: number; vendorAmount: number }> = [];
 
       for (const item of parsed.data.items) {
         // The conditional update is the reservation: concurrent checkouts
         // cannot both decrement the same final unit.
         const [product] = await tx.select().from(productsTable).where(eq(productsTable.id, item.productId));
         if (!product || !product.isActive) throw new Error(`Product ${item.productId} is unavailable.`);
-        const unitPrice = parseFloat(product.price);
+        const variants = await tx.select({ id: productVariantsTable.id }).from(productVariantsTable)
+          .where(eq(productVariantsTable.productId, product.id)).limit(1);
+        let variant: typeof productVariantsTable.$inferSelect | undefined;
+        if (item.variantId) {
+          [variant] = await tx.select().from(productVariantsTable).where(and(
+            eq(productVariantsTable.id, item.variantId),
+            eq(productVariantsTable.productId, product.id),
+            eq(productVariantsTable.isActive, true),
+          ));
+          if (!variant) throw new Error(`${product.name} variant is unavailable.`);
+          const [reservedVariant] = await tx.update(productVariantsTable)
+            .set({ reservedStock: sql`${productVariantsTable.reservedStock} + ${item.quantity}` })
+            .where(and(
+              eq(productVariantsTable.id, variant.id),
+              eq(productVariantsTable.isActive, true),
+              gte(sql`${productVariantsTable.stock} - ${productVariantsTable.reservedStock}`, item.quantity),
+            ))
+            .returning({ id: productVariantsTable.id });
+          if (!reservedVariant) throw new Error(`${product.name} (${Object.values(variant.attributes).join(" / ")}) does not have enough stock.`);
+        } else if (variants.length) {
+          throw new Error(`Select a variant for ${product.name}.`);
+        }
+        const unitPrice = parseFloat(product.price) + (variant ? parseFloat(variant.priceAdjustment) : 0);
         const lineTotal = unitPrice * item.quantity;
         const commissionAmount = lineTotal * (commissionRate / 100);
         const vendorAmount = lineTotal - commissionAmount;
         totalAmount += lineTotal;
-        const [reserved] = await tx.update(productsTable)
-          .set({ stock: sql`${productsTable.stock} - ${item.quantity}` })
-          .where(and(eq(productsTable.id, item.productId), gte(productsTable.stock, item.quantity), eq(productsTable.isActive, true)))
-          .returning({ id: productsTable.id });
-        if (!reserved) throw new Error(`${product.name} does not have enough stock.`);
+        if (!variant) {
+          const [reserved] = await tx.update(productsTable)
+            .set({ stock: sql`${productsTable.stock} - ${item.quantity}` })
+            .where(and(eq(productsTable.id, item.productId), gte(productsTable.stock, item.quantity), eq(productsTable.isActive, true)))
+            .returning({ id: productsTable.id });
+          if (!reserved) throw new Error(`${product.name} does not have enough stock.`);
+        }
         orderItems.push({
-          productId: item.productId, vendorId: product.vendorId, quantity: item.quantity,
-          selectedSize: item.selectedSize, unitPrice, commissionRate, commissionAmount, vendorAmount,
+          productId: item.productId, variantId: variant?.id, vendorId: product.vendorId, quantity: item.quantity,
+          selectedSize: variant
+            ? Object.entries(variant.attributes).find(([key]) => key.toLowerCase() === "size")?.[1]
+            : item.selectedSize,
+          unitPrice, commissionRate, commissionAmount, vendorAmount,
         });
       }
 
@@ -240,12 +304,14 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
       for (const item of orderItems) {
         const [createdItem] = await tx.insert(orderItemsTable).values({
           orderId: created.id, productId: item.productId, vendorId: item.vendorId,
+          variantId: item.variantId ?? null,
           quantity: item.quantity, selectedSize: item.selectedSize ?? null,
           unitPrice: String(item.unitPrice), commissionRate: String(item.commissionRate),
           commissionAmount: String(item.commissionAmount), vendorAmount: String(item.vendorAmount),
         }).returning({ id: orderItemsTable.id });
         await tx.insert(inventoryReservationTable).values({
           orderId: created.id, orderItemId: createdItem.id, productId: item.productId,
+          variantId: item.variantId ?? null,
           quantity: item.quantity, expiresAt: new Date(Date.now() + 30 * 60 * 1000),
         });
       }

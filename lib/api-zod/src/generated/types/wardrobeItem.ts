@@ -6,14 +6,18 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { Product } from './product';
+import type { ProductVariant } from './productVariant';
 
 export interface WardrobeItem {
   id: number;
   userId: number;
   productId: number;
   /** @nullable */
+  variantId?: number | null;
+  /** @nullable */
   selectedSize?: string | null;
   quantity?: number;
   addedAt: Date;
   product?: Product;
+  variant?: ProductVariant;
 }

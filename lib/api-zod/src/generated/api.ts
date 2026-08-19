@@ -328,6 +328,18 @@ export const GetVendorDashboardResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -396,6 +408,7 @@ export const GetVendorRecentOrdersResponseItem = zod.object({
   "id": zod.int(),
   "orderId": zod.int(),
   "productId": zod.int(),
+  "variantId": zod.int().nullish(),
   "vendorId": zod.int(),
   "quantity": zod.int(),
   "selectedSize": zod.string().nullish(),
@@ -419,6 +432,18 @@ export const GetVendorRecentOrdersResponseItem = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -452,6 +477,18 @@ export const GetVendorRecentOrdersResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 }).optional()
 }).optional()
+}).optional(),
+  "variant": zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
 }).optional()
 })).optional()
 })
@@ -536,6 +573,18 @@ export const ListProductsResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -616,6 +665,18 @@ export const CreateProductResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -679,6 +740,18 @@ export const ListFeaturedProductsResponseItem = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -743,6 +816,18 @@ export const ListTrendingProductsResponseItem = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -805,6 +890,18 @@ export const GetProductResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -878,6 +975,18 @@ export const UpdateProductResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -964,6 +1073,7 @@ export const GetWardrobeResponseItem = zod.object({
   "id": zod.int(),
   "userId": zod.int(),
   "productId": zod.int(),
+  "variantId": zod.int().nullish(),
   "selectedSize": zod.string().nullish(),
   "quantity": zod.int().optional(),
   "addedAt": zod.coerce.date(),
@@ -983,6 +1093,18 @@ export const GetWardrobeResponseItem = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -1016,6 +1138,18 @@ export const GetWardrobeResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 }).optional()
 }).optional()
+}).optional(),
+  "variant": zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
 }).optional()
 })
 export const GetWardrobeResponse = zod.array(GetWardrobeResponseItem)
@@ -1028,6 +1162,7 @@ export const addToWardrobeBodyQuantityDefault = 1;
 
 export const AddToWardrobeBody = zod.object({
   "productId": zod.int(),
+  "variantId": zod.int().optional(),
   "selectedSize": zod.string().optional(),
   "quantity": zod.int().default(addToWardrobeBodyQuantityDefault)
 })
@@ -1038,6 +1173,7 @@ export const AddToWardrobeResponse = zod.object({
   "id": zod.int(),
   "userId": zod.int(),
   "productId": zod.int(),
+  "variantId": zod.int().nullish(),
   "selectedSize": zod.string().nullish(),
   "quantity": zod.int().optional(),
   "addedAt": zod.coerce.date(),
@@ -1057,6 +1193,18 @@ export const AddToWardrobeResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -1090,6 +1238,18 @@ export const AddToWardrobeResponse = zod.object({
   "createdAt": zod.coerce.date()
 }).optional()
 }).optional()
+}).optional(),
+  "variant": zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
 }).optional()
 })
 
@@ -1102,6 +1262,16 @@ export const RemoveFromWardrobeParams = zod.object({
 })
 
 export const RemoveFromWardrobeResponse = zod.void()
+
+
+/**
+ * @summary Remove one selected item from the current user's wardrobe
+ */
+export const RemoveWardrobeItemParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const RemoveWardrobeItemResponse = zod.void()
 
 
 /**
@@ -1137,6 +1307,7 @@ export const ListOrdersResponseItem = zod.object({
   "id": zod.int(),
   "orderId": zod.int(),
   "productId": zod.int(),
+  "variantId": zod.int().nullish(),
   "vendorId": zod.int(),
   "quantity": zod.int(),
   "selectedSize": zod.string().nullish(),
@@ -1160,6 +1331,18 @@ export const ListOrdersResponseItem = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -1193,6 +1376,18 @@ export const ListOrdersResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 }).optional()
 }).optional()
+}).optional(),
+  "variant": zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
 }).optional()
 })).optional()
 })
@@ -1209,6 +1404,7 @@ export const ListOrdersResponse = zod.array(ListOrdersResponseItem)
 export const CreateOrderBody = zod.object({
   "items": zod.array(zod.object({
   "productId": zod.int(),
+  "variantId": zod.int().optional(),
   "quantity": zod.int().min(1),
   "selectedSize": zod.string().optional()
 })).min(1),
@@ -1241,6 +1437,7 @@ export const CreateOrderResponse = zod.object({
   "id": zod.int(),
   "orderId": zod.int(),
   "productId": zod.int(),
+  "variantId": zod.int().nullish(),
   "vendorId": zod.int(),
   "quantity": zod.int(),
   "selectedSize": zod.string().nullish(),
@@ -1264,6 +1461,18 @@ export const CreateOrderResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -1297,6 +1506,18 @@ export const CreateOrderResponse = zod.object({
   "createdAt": zod.coerce.date()
 }).optional()
 }).optional()
+}).optional(),
+  "variant": zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
 }).optional()
 })).optional()
 })
@@ -1331,6 +1552,7 @@ export const GetOrderResponse = zod.object({
   "id": zod.int(),
   "orderId": zod.int(),
   "productId": zod.int(),
+  "variantId": zod.int().nullish(),
   "vendorId": zod.int(),
   "quantity": zod.int(),
   "selectedSize": zod.string().nullish(),
@@ -1354,6 +1576,18 @@ export const GetOrderResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -1387,6 +1621,18 @@ export const GetOrderResponse = zod.object({
   "createdAt": zod.coerce.date()
 }).optional()
 }).optional()
+}).optional(),
+  "variant": zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
 }).optional()
 })).optional()
 })
@@ -1425,6 +1671,7 @@ export const UpdateOrderStatusResponse = zod.object({
   "id": zod.int(),
   "orderId": zod.int(),
   "productId": zod.int(),
+  "variantId": zod.int().nullish(),
   "vendorId": zod.int(),
   "quantity": zod.int(),
   "selectedSize": zod.string().nullish(),
@@ -1448,6 +1695,18 @@ export const UpdateOrderStatusResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -1481,6 +1740,18 @@ export const UpdateOrderStatusResponse = zod.object({
   "createdAt": zod.coerce.date()
 }).optional()
 }).optional()
+}).optional(),
+  "variant": zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
 }).optional()
 })).optional()
 })
@@ -1797,6 +2068,18 @@ export const GetStorefrontSummaryResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -1847,6 +2130,18 @@ export const GetStorefrontSummaryResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -1957,6 +2252,7 @@ export const GetAdminStatsResponse = zod.object({
   "id": zod.int(),
   "orderId": zod.int(),
   "productId": zod.int(),
+  "variantId": zod.int().nullish(),
   "vendorId": zod.int(),
   "quantity": zod.int(),
   "selectedSize": zod.string().nullish(),
@@ -1980,6 +2276,18 @@ export const GetAdminStatsResponse = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -2013,6 +2321,18 @@ export const GetAdminStatsResponse = zod.object({
   "createdAt": zod.coerce.date()
 }).optional()
 }).optional()
+}).optional(),
+  "variant": zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
 }).optional()
 })).optional()
 })).optional(),
@@ -2384,6 +2704,18 @@ export const ListAdminProductsResponseItem = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -2455,6 +2787,7 @@ export const ListAdminOrdersResponseItem = zod.object({
   "id": zod.int(),
   "orderId": zod.int(),
   "productId": zod.int(),
+  "variantId": zod.int().nullish(),
   "vendorId": zod.int(),
   "quantity": zod.int(),
   "selectedSize": zod.string().nullish(),
@@ -2478,6 +2811,18 @@ export const ListAdminOrdersResponseItem = zod.object({
   "wardrobeCount": zod.int().optional(),
   "averageRating": zod.number().nullish(),
   "reviewCount": zod.int().optional(),
+  "variants": zod.array(zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
+})).optional(),
   "createdAt": zod.coerce.date(),
   "vendor": zod.object({
   "id": zod.int(),
@@ -2511,6 +2856,18 @@ export const ListAdminOrdersResponseItem = zod.object({
   "createdAt": zod.coerce.date()
 }).optional()
 }).optional()
+}).optional(),
+  "variant": zod.object({
+  "id": zod.int(),
+  "productId": zod.int(),
+  "sku": zod.string(),
+  "attributes": zod.record(zod.string(), zod.string()),
+  "priceAdjustment": zod.number(),
+  "stock": zod.int(),
+  "reservedStock": zod.int(),
+  "availableStock": zod.int(),
+  "isActive": zod.boolean(),
+  "createdAt": zod.coerce.date()
 }).optional()
 })).optional()
 })
