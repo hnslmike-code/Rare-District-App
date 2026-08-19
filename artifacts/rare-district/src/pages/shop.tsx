@@ -47,13 +47,13 @@ export default function Shop() {
   const categories = ["All", "new", "designers", "editorial", "tops", "bottoms", "dresses", "outerwear", "accessories"];
 
   return (
-    <div className="min-h-screen bg-background pt-10 pb-24 nebula-surface">
+    <div className="showroom-page min-h-screen bg-background pb-24">
       <div className="container mx-auto px-4 md:px-6">
         
         {/* Header */}
-         <div className="mb-12 border-b border-border/70 pb-12">
-           <p className="text-primary text-xs uppercase tracking-[0.3em] mb-4">Rare District / Showroom</p>
-           <h1 className="font-serif text-4xl md:text-6xl font-medium tracking-tight mb-4">The Collection</h1>
+         <div className="showroom-heading mb-12 border-b border-border/70 pb-12">
+           <p className="eyebrow">Rare District / Showroom</p>
+           <h1>The Collection</h1>
           <p className="text-muted-foreground text-lg max-w-2xl">
             {category ? `Exploring ${category} pieces from our curated selection.` : "Explore our curated selection of vanguard pieces."}
           </p>
@@ -62,13 +62,13 @@ export default function Shop() {
         {/* Filters Toolbar */}
         <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center mb-12 pb-6 border-b border-border">
           
-          <div className="hidden md:flex flex-wrap gap-8 items-center text-sm font-medium tracking-widest uppercase">
+          <div className="hidden md:flex flex-wrap gap-7 items-center text-xs font-bold tracking-[0.18em] uppercase">
             {categories.map((c) => (
               <button
                 key={c}
                 onClick={() => { setCategory(c === "All" ? "" : c); setPage(1); }}
-                className={`transition-colors hover:text-primary ${
-                  (c === "All" && !category) || category === c ? "text-primary border-b border-primary" : "text-muted-foreground"
+                  className={`category-tab transition-colors ${
+                   (c === "All" && !category) || category === c ? "is-active" : ""
                 }`}
               >
                 {c}
@@ -108,11 +108,11 @@ export default function Shop() {
             {/* Search */}
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input 
+               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search..." 
-                className="pl-9 rounded-none border-border focus-visible:ring-primary focus-visible:border-primary bg-transparent"
+                 className="pl-9 rounded-none border-border focus-visible:ring-primary focus-visible:border-primary bg-transparent"
               />
               {search && (
                 <button onClick={() => setSearch("")} className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -150,27 +150,27 @@ export default function Shop() {
           </div>
         ) : productsData?.items && productsData.items.length > 0 ? (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 md:gap-x-10 md:gap-y-16">
+             <div className="showroom-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 md:gap-x-8 md:gap-y-16">
               {productsData.items.map((product) => (
                 <Link key={product.id} href={`/product/${product.id}`} className="group block">
-                   <div className="aspect-[3/4] overflow-hidden bg-secondary mb-6 relative luxury-image">
+                   <div className="showroom-product-image aspect-[3/4] overflow-hidden bg-secondary mb-6 relative luxury-image">
                     {product.images?.[0] ? (
                       <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-muted-foreground font-serif">No Image</div>
+                       <div className="product-placeholder h-full w-full"><span className="product-placeholder-index">RD / {String(product.id).padStart(2, "0")}</span><strong>{product.name}</strong><span>{product.vendor?.brandName || "Rare District"}</span></div>
                     )}
                     {product.stock === 0 && (
                       <div className="absolute top-4 left-4 bg-background px-3 py-1 text-xs font-bold tracking-widest uppercase shadow-sm">Sold Out</div>
                     )}
                     {product.isFeatured && product.stock > 0 && (
-                      <div className="absolute top-4 left-4 bg-primary text-primary-foreground px-3 py-1 text-xs font-bold tracking-widest uppercase shadow-sm">Featured</div>
+                       <div className="absolute top-4 left-4 bg-foreground text-background px-3 py-1 text-xs font-bold tracking-widest uppercase shadow-sm">Featured</div>
                     )}
                   </div>
                   <div className="flex justify-between items-start gap-4">
                     <div>
-                      <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground mb-2 line-clamp-1">{product.vendor?.brandName || "Rare District"}</p>
-                      <h3 className="font-serif text-lg md:text-xl font-medium mb-2 group-hover:text-primary transition-colors line-clamp-2">{product.name}</h3>
-                      <p className="text-sm">{product.currency} {product.price.toLocaleString()}</p>
+                       <p className="eyebrow mb-2 line-clamp-1">{product.vendor?.brandName || "Rare District"}</p>
+                       <h3 className="font-serif text-lg md:text-xl font-medium mb-2 group-hover:underline transition-colors line-clamp-2">{product.name}</h3>
+                       <p className="font-serif text-base">{product.currency} {product.price.toLocaleString()}</p>
                     </div>
                   </div>
                 </Link>

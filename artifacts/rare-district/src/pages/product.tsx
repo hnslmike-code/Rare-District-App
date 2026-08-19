@@ -86,7 +86,7 @@ export default function ProductDetail() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-12 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-12 nebula-surface">
+      <div className="container mx-auto px-4 py-12 md:py-20 grid grid-cols-1 md:grid-cols-2 gap-12">
         <Skeleton className="aspect-[3/4] w-full rounded-none" />
         <div className="space-y-8 mt-12">
           <Skeleton className="h-8 w-1/4 rounded-none" />
@@ -121,7 +121,7 @@ export default function ProductDetail() {
   })();
 
   return (
-    <div className="bg-background pt-8 pb-32 nebula-surface">
+    <div className="product-page bg-background pt-8 pb-32">
       <div className="container mx-auto px-4 md:px-6">
         
         {/* Breadcrumb */}
@@ -153,7 +153,7 @@ export default function ProductDetail() {
             )}
             
             {/* Main Image */}
-             <div className="flex-1 aspect-[3/4] bg-secondary relative overflow-hidden group luxury-image">
+             <div className="detail-image flex-1 aspect-[3/4] bg-secondary relative overflow-hidden group luxury-image">
               {product.images?.[activeImage] ? (
                 <img 
                   src={product.images[activeImage]} 
@@ -161,7 +161,7 @@ export default function ProductDetail() {
                   className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-1000 ease-out" 
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center font-serif text-xl text-muted-foreground">No Image Available</div>
+                <div className="product-placeholder h-full w-full"><span className="product-placeholder-index">RD / {String(product.id).padStart(2, "0")}</span><strong>{product.name}</strong><span>{product.vendor?.brandName || "Rare District"}</span></div>
               )}
             </div>
           </div>
