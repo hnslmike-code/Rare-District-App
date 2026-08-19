@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "wouter";
 import { useAddToWardrobe, useGetStorefrontSummary, useListProducts } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ArrowRight, Pause, Play, ShoppingBag, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, ShoppingBag, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCard } from "@/components/ProductCard";
 import { useAuth } from "@/contexts/AuthContext";
@@ -180,13 +180,8 @@ function LayeredCarousel({ entries, onQuickAdd, autoplay = true }: { entries: Ca
       </div>
       <div className="mt-8 flex items-center justify-center gap-5">
         <button onClick={() => go(-1)} className="carousel-control" aria-label="Previous featured item"><ArrowLeft className="h-4 w-4" /></button>
-        <div className="flex items-center gap-2" aria-label={`${safeIndex + 1} of ${count}`}>
-          {entries.slice(0, Math.min(count, 6)).map((entry, index) => <button key={`${entry.kind}-${entry.product.id}`} aria-label={`Go to item ${index + 1}`} onClick={() => setActive(index)} className={`carousel-dot ${index === safeIndex ? "is-active" : ""}`} />)}
-        </div>
         <button onClick={() => go(1)} className="carousel-control" aria-label="Next featured item"><ArrowRight className="h-4 w-4" /></button>
-        <button onClick={() => setPaused((value) => !value)} className="carousel-play" aria-label={paused ? "Play carousel" : "Pause carousel"}>{paused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}</button>
       </div>
-      <p className="mt-4 text-center text-[10px] font-semibold uppercase tracking-[0.22em] text-muted-foreground">Swipe to explore · {safeIndex + 1} / {count}</p>
     </div>
   );
 }
