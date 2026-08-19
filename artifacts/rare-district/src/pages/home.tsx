@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "wouter";
 import { useAddToWardrobe, useGetStorefrontSummary, useListProducts } from "@workspace/api-client-react";
 import { ArrowLeft, ArrowRight, Pause, Play, ShoppingBag, X } from "lucide-react";
@@ -110,6 +110,8 @@ function LayeredCarousel({ entries, onQuickAdd }: { entries: CarouselEntry[]; on
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const [dragStart, setDragStart] = useState<number | null>(null);
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const count = entries.length;
   const safeIndex = count ? active % count : 0;
@@ -122,17 +124,38 @@ function LayeredCarousel({ entries, onQuickAdd }: { entries: CarouselEntry[]; on
 
   const go = (delta: number) => setActive((current) => (current + delta + count) % count);
   const getEntry = (offset: number) => entries[(safeIndex + offset + count) % count];
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    setDragStart(event.clientX);
+    setDragOffset(0);
+    setIsDragging(true);
+    setPaused(true);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStart === null) return;
+    const delta = event.clientX - dragStart;
+    setDragOffset(Math.max(-150, Math.min(150, delta)));
+  };
+  const finishDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (dragStart !== null && Math.abs(event.clientX - dragStart) > 45) {
+      go(event.clientX < dragStart ? 1 : -1);
+    }
+    setDragStart(null);
+    setDragOffset(0);
+    setIsDragging(false);
+    if (event.pointerType === "touch") setPaused(false);
+  };
   if (!count) return <div className="border border-border py-24 text-center text-muted-foreground">The edit is being assembled.</div>;
 
   return (
     <div className="layered-carousel" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} onFocus={() => setPaused(true)} onBlur={() => setPaused(false)}>
-      <div className="layered-carousel-stage" onPointerDown={(event) => { setDragStart(event.clientX); event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={(event) => { if (dragStart !== null && Math.abs(event.clientX - dragStart) > 45) go(event.clientX < dragStart ? 1 : -1); setDragStart(null); }} onKeyDown={(event) => { if (event.key === "ArrowRight") go(1); if (event.key === "ArrowLeft") go(-1); }} tabIndex={0} aria-label="Featured product carousel">
+      <div className={`layered-carousel-stage${isDragging ? " is-dragging" : ""}`} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={finishDrag} onPointerCancel={finishDrag} onKeyDown={(event) => { if (event.key === "ArrowRight") go(1); if (event.key === "ArrowLeft") go(-1); }} tabIndex={0} aria-label="Featured product carousel">
         {[-1, 0, 1].map((offset) => {
           const entry = getEntry(offset);
           const product = entry.product;
           const isActive = offset === 0;
           return (
-            <article key={`${entry.kind}-${product.id}-${offset}`} className={`layered-slide ${isActive ? "is-active" : offset < 0 ? "is-prev" : "is-next"}`}>
+            <article key={`${entry.kind}-${product.id}-${offset}`} className={`layered-slide ${isActive ? "is-active" : offset < 0 ? "is-prev" : "is-next"}`} style={{ "--drag-offset": `${dragOffset}px` } as CSSProperties}>
               <Link href={entry.kind === "collection" ? `/shop?category=${entry.category}` : `/product/${product.id}`} className="block h-full" tabIndex={isActive ? 0 : -1}>
                 <div className="layered-slide-image">
                   {imageUrl(product) ? <img src={imageUrl(product)} alt={entry.kind === "collection" ? entry.title : product.name} draggable={false} /> : <ProductPlaceholder product={product} collection={entry.kind === "collection"} />}
