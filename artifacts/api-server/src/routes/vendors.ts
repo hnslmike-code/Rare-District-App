@@ -7,6 +7,7 @@ import { defaultVendorJoinPageContent, normalizeVendorJoinPageContent } from "..
 import { ObjectStorageService } from "../lib/objectStorage";
 import { formatPublicVendor } from "../lib/public-responses";
 import { hasApprovedVendorAccess } from "../lib/security-boundaries";
+import { recordOrderItemLedgerEntry } from "./orders";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -217,12 +218,11 @@ router.get("/vendors/dashboard", requireAuth, async (req, res): Promise<void> =>
 
   const salesRows = await db.select({
     productId: orderItemsTable.productId,
-    unitsSold: sql<number>`coalesce(sum(${orderItemsTable.quantity}), 0)`,
-    revenue: sql<number>`coalesce(sum(${orderItemsTable.vendorAmount}), 0)`,
+    unitsSold: sql<number>`coalesce(sum(case when ${transactionsTable.transactionType} = 'sale' then ${orderItemsTable.quantity} else 0 end), 0)`,
+    revenue: sql<number>`coalesce(sum(${transactionsTable.vendorAmount}), 0)`,
   }).from(orderItemsTable)
     .innerJoin(transactionsTable, and(
-      eq(transactionsTable.orderId, orderItemsTable.orderId),
-      eq(transactionsTable.vendorId, vendor.id),
+      eq(transactionsTable.orderItemId, orderItemsTable.id),
       eq(transactionsTable.status, "success"),
     ))
     .where(eq(orderItemsTable.vendorId, vendor.id))
@@ -360,20 +360,46 @@ router.patch("/vendors/orders/:orderId/items/:itemId/fulfillment", requireAuth, 
     res.status(400).json({ error: "Tracking number is required before shipping." });
     return;
   }
-  const updated = await db.transaction(async (tx) => {
-    if (status === "cancelled") {
-      await tx.update(productsTable)
-        .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
-        .where(eq(productsTable.id, item.productId));
+  let updated: typeof orderItemsTable.$inferSelect;
+  try {
+    updated = await db.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`);
+      const [lockedOrder] = await tx.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+      if (!lockedOrder) throw new Error("FULFILLMENT_ITEM_NOT_FOUND");
+      await tx.execute(sql`SELECT id FROM order_items WHERE id = ${item.id} FOR UPDATE`);
+      const [lockedItem] = await tx.select().from(orderItemsTable).where(eq(orderItemsTable.id, item.id));
+      if (!lockedItem) throw new Error("FULFILLMENT_ITEM_NOT_FOUND");
+      if (lockedItem.fulfillmentStatus === status) return lockedItem;
+      if (!transitions[lockedItem.fulfillmentStatus]?.includes(status)) {
+        throw new Error("INVALID_FULFILLMENT_TRANSITION");
+      }
+      const shouldRestoreInventory = status === "cancelled" || status === "returned" ||
+        (status === "refunded" && lockedItem.fulfillmentStatus !== "returned");
+      if (shouldRestoreInventory) {
+        await tx.update(productsTable)
+          .set({ stock: sql`${productsTable.stock} + ${lockedItem.quantity}` })
+          .where(eq(productsTable.id, lockedItem.productId));
+      }
+      if (status === "cancelled" || status === "returned" || status === "refunded") {
+        await recordOrderItemLedgerEntry(tx, lockedOrder, lockedItem, status === "cancelled" ? "reversal" : "refund");
+      }
+      const [next] = await tx.update(orderItemsTable).set({
+        fulfillmentStatus: status as typeof lockedItem.fulfillmentStatus,
+        trackingNumber: trackingNumber ?? lockedItem.trackingNumber,
+        carrier: carrier ?? lockedItem.carrier,
+        shippedAt: status === "shipped" ? new Date() : lockedItem.shippedAt,
+      }).where(eq(orderItemsTable.id, lockedItem.id)).returning();
+      return next;
+    });
+  } catch (error) {
+    if (error instanceof Error && (error.message === "FULFILLMENT_ITEM_NOT_FOUND" || error.message === "INVALID_FULFILLMENT_TRANSITION")) {
+      res.status(error.message === "FULFILLMENT_ITEM_NOT_FOUND" ? 404 : 409).json({
+        error: error.message === "FULFILLMENT_ITEM_NOT_FOUND" ? "Fulfillment item not found." : `Cannot move this item from its current status to ${status}.`,
+      });
+      return;
     }
-    const [next] = await tx.update(orderItemsTable).set({
-      fulfillmentStatus: status as typeof item.fulfillmentStatus,
-      trackingNumber: trackingNumber ?? item.trackingNumber,
-      carrier: carrier ?? item.carrier,
-      shippedAt: status === "shipped" ? new Date() : item.shippedAt,
-    }).where(eq(orderItemsTable.id, item.id)).returning();
-    return next;
-  });
+    throw error;
+  }
   res.json({
     id: updated.id, orderId: updated.orderId, productId: updated.productId,
     fulfillmentStatus: updated.fulfillmentStatus, trackingNumber: updated.trackingNumber,

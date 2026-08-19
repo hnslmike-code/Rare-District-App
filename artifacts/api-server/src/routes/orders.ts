@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, productsTable, vendorsTable, adminSettingsTable } from "@workspace/db";
+import { db, ordersTable, orderItemsTable, productsTable, vendorsTable, transactionsTable, adminSettingsTable } from "@workspace/db";
 import { CreateOrderBody, GetOrderParams, UpdateOrderStatusParams, UpdateOrderStatusBody, ListOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import {
@@ -16,19 +16,107 @@ import {
 
 const router: IRouter = Router();
 
+type LedgerEntryType = "sale" | "refund" | "reversal";
+type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type OrderRow = typeof ordersTable.$inferSelect;
+type OrderItemRow = typeof orderItemsTable.$inferSelect;
+
+function ledgerReference(order: OrderRow, item: OrderItemRow, entryType: LedgerEntryType, paymentReference?: string) {
+  return `${paymentReference ?? order.paymentReference ?? `order-${order.id}`}:${entryType}:${item.id}`;
+}
+
+/**
+ * Records a signed vendor ledger entry exactly once for an order item. Sales
+ * are positive; refunds and reversals are negative offsets to the same vendor
+ * earnings and commission amounts.
+ */
+export async function recordOrderItemLedgerEntry(
+  tx: DbTransaction,
+  order: OrderRow,
+  item: OrderItemRow,
+  entryType: LedgerEntryType,
+  paymentReference?: string,
+) {
+  const reference = ledgerReference(order, item, entryType, paymentReference);
+  const [existing] = await tx.select({ id: transactionsTable.id })
+    .from(transactionsTable)
+    .where(eq(transactionsTable.reference, reference))
+    .limit(1);
+  if (existing) return false;
+
+  let processor = order.paymentProcessor;
+  if (entryType !== "sale") {
+    const sales = await tx.select({
+      id: transactionsTable.id,
+      orderItemId: transactionsTable.orderItemId,
+      processor: transactionsTable.processor,
+    }).from(transactionsTable).where(and(
+      eq(transactionsTable.orderId, order.id),
+      eq(transactionsTable.vendorId, item.vendorId),
+      eq(transactionsTable.transactionType, "sale"),
+      eq(transactionsTable.status, "success"),
+    ));
+    // Item-linked sales provide an exact audit trail. Older sales were not
+    // item-linked, but any successful vendor sale proves the item amount is
+    // already included in that vendor's balance and can be offset safely.
+    const sale = sales.find(transaction => transaction.orderItemId === item.id) ?? sales[0];
+    if (!sale) return false;
+    processor = sale.processor as typeof order.paymentProcessor;
+  }
+  if (!processor) return false;
+
+  const multiplier = entryType === "sale" ? 1 : -1;
+  const amount = parseFloat(item.unitPrice) * item.quantity * multiplier;
+  const commissionAmount = parseFloat(item.commissionAmount) * multiplier;
+  const vendorAmount = parseFloat(item.vendorAmount) * multiplier;
+  const [inserted] = await tx.insert(transactionsTable).values({
+    orderId: order.id,
+    orderItemId: item.id,
+    buyerId: order.userId,
+    vendorId: item.vendorId,
+    amount: String(amount),
+    commissionRate: item.commissionRate,
+    commissionAmount: String(commissionAmount),
+    vendorAmount: String(vendorAmount),
+    processor,
+    reference,
+    status: "success",
+    transactionType: entryType,
+  }).onConflictDoNothing({
+    target: [transactionsTable.orderItemId, transactionsTable.transactionType],
+  }).returning({ id: transactionsTable.id });
+  if (!inserted) return false;
+  await tx.update(vendorsTable)
+    .set({ payoutBalance: sql`${vendorsTable.payoutBalance} + ${vendorAmount}` })
+    .where(eq(vendorsTable.id, item.vendorId));
+  return true;
+}
+
 export async function releaseOrderInventory(orderId: number, status: "cancelled" = "cancelled") {
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`);
     const [order] = await tx.select().from(ordersTable).where(eq(ordersTable.id, orderId));
-    if (!order || order.inventoryReleasedAt) return order;
+    if (!order) return order;
+    await tx.execute(sql`SELECT id FROM order_items WHERE order_id = ${orderId} FOR UPDATE`);
     const items = await tx.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
     for (const item of items) {
-      await tx.update(productsTable)
-        .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
-        .where(eq(productsTable.id, item.productId));
+      const inventoryAlreadyRestored = ["cancelled", "returned", "refunded"].includes(item.fulfillmentStatus);
+      if (!order.inventoryReleasedAt && !inventoryAlreadyRestored) {
+        await tx.update(productsTable)
+          .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
+          .where(eq(productsTable.id, item.productId));
+        await tx.update(orderItemsTable)
+          .set({ fulfillmentStatus: "cancelled" })
+          .where(eq(orderItemsTable.id, item.id));
+      }
+      // A terminal item has already recorded its financial offset. Do not
+      // reverse it again when the rest of its order is later cancelled.
+      if (!inventoryAlreadyRestored) {
+        await recordOrderItemLedgerEntry(tx, order, item, "reversal");
+      }
     }
     const [updated] = await tx.update(ordersTable)
-      .set({ status, inventoryReleasedAt: new Date() })
+      .set({ status, inventoryReleasedAt: order.inventoryReleasedAt ?? new Date() })
       .where(eq(ordersTable.id, orderId))
       .returning();
     return updated;

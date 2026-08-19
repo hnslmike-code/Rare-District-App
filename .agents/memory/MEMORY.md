@@ -1,3 +1,4 @@
 - [API Zod code generation](api-zod-codegen.md) — generated Zod 4 schemas need the workspace’s `zod/v4` import path after regeneration.
 - [API security test runner](api-security-test-runner.md) — policy tests import TypeScript source with Node type stripping, not the bundled API output.
 - [Admin vendor data boundaries](admin-vendor-data-boundaries.md) — vendor operations responses must use explicit redacted shapes, not generic vendor/product contracts.
+- [Financial ledger reconciliation](financial-ledger-reconciliation.md) — financial lifecycle flows share order-then-item locks and one signed ledger offset per item.

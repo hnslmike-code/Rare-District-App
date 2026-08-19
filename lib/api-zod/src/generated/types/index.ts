@@ -89,6 +89,7 @@ export * from './successEnvelope';
 export * from './transaction';
 export * from './transactionProcessor';
 export * from './transactionStatus';
+export * from './transactionTransactionType';
 export * from './uploadUrlRequest';
 export * from './uploadUrlResponse';
 export * from './user';

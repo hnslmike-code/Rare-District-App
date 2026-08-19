@@ -1,9 +1,9 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, transactionsTable, vendorsTable } from "@workspace/db";
+import { db, ordersTable, orderItemsTable, transactionsTable } from "@workspace/db";
 import { InitiatePaystackPaymentBody, InitiateFlutterwavePaymentBody, VerifyPaystackPaymentBody, VerifyFlutterwavePaymentBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
-import { releaseOrderInventory } from "./orders";
+import { releaseOrderInventory, recordOrderItemLedgerEntry } from "./orders";
 import { canAccessCustomerOrder } from "../lib/security-boundaries";
 
 const router: IRouter = Router();
@@ -15,9 +15,14 @@ async function settlePaidOrder(order: typeof ordersTable.$inferSelect, processor
   return db.transaction(async (tx) => {
     // Serialize settlement per order so a repeated callback cannot double-credit.
     await tx.execute(sql`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`);
+    const [lockedOrder] = await tx.select().from(ordersTable).where(eq(ordersTable.id, order.id));
+    if (!lockedOrder || lockedOrder.status === "cancelled") return false;
+    // Keep the same order-then-item locking order used by fulfillment updates.
+    // This prevents an unpaid return/cancellation from racing a late callback.
+    await tx.execute(sql`SELECT id FROM order_items WHERE order_id = ${order.id} FOR UPDATE`);
     const [existing] = await tx.select().from(transactionsTable).where(and(
       eq(transactionsTable.orderId, order.id),
-      eq(transactionsTable.reference, reference),
+      eq(transactionsTable.transactionType, "sale"),
       eq(transactionsTable.status, "success"),
     )).limit(1);
     if (existing) return false;
@@ -25,21 +30,11 @@ async function settlePaidOrder(order: typeof ordersTable.$inferSelect, processor
     await tx.update(ordersTable).set({ status: "paid" }).where(eq(ordersTable.id, order.id));
     const items = await tx.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
     for (const item of items) {
-      await tx.insert(transactionsTable).values({
-        orderId: order.id,
-        buyerId: order.userId,
-        vendorId: item.vendorId,
-        amount: String(parseFloat(item.unitPrice) * item.quantity),
-        commissionRate: item.commissionRate,
-        commissionAmount: item.commissionAmount,
-        vendorAmount: item.vendorAmount,
-        processor,
-        reference,
-        status: "success",
-      });
-      await tx.update(vendorsTable)
-        .set({ payoutBalance: sql`${vendorsTable.payoutBalance} + ${parseFloat(item.vendorAmount)}` })
-        .where(eq(vendorsTable.id, item.vendorId));
+      // Inventory and fulfillment were already unwound before payment settled;
+      // do not credit a vendor for an item that is terminal.
+      if (!["cancelled", "returned", "refunded"].includes(item.fulfillmentStatus)) {
+        await recordOrderItemLedgerEntry(tx, lockedOrder, item, "sale", reference);
+      }
     }
     return true;
   });

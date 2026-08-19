@@ -2531,6 +2531,7 @@ export const ListTransactionsQueryParams = zod.object({
 export const ListTransactionsResponseItem = zod.object({
   "id": zod.int(),
   "orderId": zod.int(),
+  "orderItemId": zod.int().nullish(),
   "buyerId": zod.int(),
   "vendorId": zod.int(),
   "amount": zod.number(),
@@ -2540,6 +2541,7 @@ export const ListTransactionsResponseItem = zod.object({
   "processor": zod.enum(['paystack', 'flutterwave']),
   "reference": zod.string().optional(),
   "status": zod.enum(['pending', 'success', 'failed']),
+  "transactionType": zod.enum(['sale', 'refund', 'reversal']),
   "createdAt": zod.coerce.date()
 })
 export const ListTransactionsResponse = zod.array(ListTransactionsResponseItem)

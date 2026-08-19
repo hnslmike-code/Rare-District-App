@@ -11,6 +11,12 @@ const statusColors: Record<string, string> = {
   failed: "bg-red-100 text-red-800",
 };
 
+const transactionTypeLabel: Record<string, string> = {
+  sale: "Sale",
+  refund: "Refund",
+  reversal: "Reversal",
+};
+
 export default function AdminTransactions() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -45,6 +51,7 @@ export default function AdminTransactions() {
               <tr className="border-b border-border">
                 <th className="text-left py-3 px-4 font-bold tracking-widest uppercase text-xs text-muted-foreground">ID</th>
                 <th className="text-left py-3 px-4 font-bold tracking-widest uppercase text-xs text-muted-foreground">Order</th>
+                <th className="text-left py-3 px-4 font-bold tracking-widest uppercase text-xs text-muted-foreground">Entry</th>
                 <th className="text-left py-3 px-4 font-bold tracking-widest uppercase text-xs text-muted-foreground">Amount</th>
                 <th className="text-left py-3 px-4 font-bold tracking-widest uppercase text-xs text-muted-foreground">Commission</th>
                 <th className="text-left py-3 px-4 font-bold tracking-widest uppercase text-xs text-muted-foreground">Vendor</th>
@@ -57,6 +64,11 @@ export default function AdminTransactions() {
                 <tr key={tx.id} className="border-b border-border hover:bg-secondary/30" data-testid={`tx-${tx.id}`}>
                   <td className="py-4 px-4 font-mono text-xs text-muted-foreground">#{tx.id}</td>
                   <td className="py-4 px-4 font-medium">Order #{tx.orderId}</td>
+                  <td className="py-4 px-4">
+                    <span className={tx.transactionType === "sale" ? "text-xs font-bold tracking-widest uppercase text-muted-foreground" : "text-xs font-bold tracking-widest uppercase text-amber-700"}>
+                      {transactionTypeLabel[tx.transactionType] ?? tx.transactionType}
+                    </span>
+                  </td>
                   <td className="py-4 px-4 font-serif font-medium">₦{tx.amount.toLocaleString()}</td>
                   <td className="py-4 px-4 text-muted-foreground">₦{tx.commissionAmount.toLocaleString()} <span className="text-xs">({tx.commissionRate}%)</span></td>
                   <td className="py-4 px-4 font-medium">₦{tx.vendorAmount.toLocaleString()}</td>

@@ -7,10 +7,13 @@
  */
 import type { TransactionProcessor } from './transactionProcessor';
 import type { TransactionStatus } from './transactionStatus';
+import type { TransactionTransactionType } from './transactionTransactionType';
 
 export interface Transaction {
   id: number;
   orderId: number;
+  /** @nullable */
+  orderItemId?: number | null;
   buyerId: number;
   vendorId: number;
   amount: number;
@@ -20,5 +23,6 @@ export interface Transaction {
   processor: TransactionProcessor;
   reference?: string;
   status: TransactionStatus;
+  transactionType: TransactionTransactionType;
   createdAt: Date;
 }

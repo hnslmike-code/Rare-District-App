@@ -638,6 +638,7 @@ router.get("/admin/transactions", requireAuth, requireRole("admin"), async (req,
   const txs = await db.select().from(transactionsTable).orderBy(desc(transactionsTable.createdAt)).limit(limit).offset(offset);
   res.json(txs.map(t => ({
     id: t.id, orderId: t.orderId, buyerId: t.buyerId, vendorId: t.vendorId,
+    orderItemId: t.orderItemId, transactionType: t.transactionType,
     amount: parseFloat(t.amount), commissionRate: parseFloat(t.commissionRate),
     commissionAmount: parseFloat(t.commissionAmount), vendorAmount: parseFloat(t.vendorAmount),
     processor: t.processor, reference: t.reference, status: t.status, createdAt: t.createdAt,

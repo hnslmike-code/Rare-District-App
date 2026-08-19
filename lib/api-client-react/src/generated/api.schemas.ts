@@ -933,9 +933,20 @@ export const TransactionStatus = {
   failed: 'failed',
 } as const;
 
+export type TransactionTransactionType = typeof TransactionTransactionType[keyof typeof TransactionTransactionType];
+
+
+export const TransactionTransactionType = {
+  sale: 'sale',
+  refund: 'refund',
+  reversal: 'reversal',
+} as const;
+
 export interface Transaction {
   id: number;
   orderId: number;
+  /** @nullable */
+  orderItemId?: number | null;
   buyerId: number;
   vendorId: number;
   amount: number;
@@ -945,6 +956,7 @@ export interface Transaction {
   processor: TransactionProcessor;
   reference?: string;
   status: TransactionStatus;
+  transactionType: TransactionTransactionType;
   createdAt: string;
 }
 
