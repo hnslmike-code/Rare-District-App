@@ -6,6 +6,7 @@ import { usersTable } from "./users";
 import { vendorsTable } from "./vendors";
 
 export const transactionStatusEnum = pgEnum("transaction_status", ["pending", "success", "failed"]);
+export const payoutStatusEnum = pgEnum("payout_status", ["pending", "approved", "paid", "failed", "reversed"]);
 
 export const transactionsTable = pgTable("transactions", {
   id: serial("id").primaryKey(),
@@ -27,6 +28,10 @@ export const payoutRecordsTable = pgTable("payout_records", {
   vendorId: serial("vendor_id").notNull().references(() => vendorsTable.id),
   amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
   note: text("note"),
+  status: payoutStatusEnum("status").notNull().default("pending"),
+  reference: text("reference"),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  paidAt: timestamp("paid_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

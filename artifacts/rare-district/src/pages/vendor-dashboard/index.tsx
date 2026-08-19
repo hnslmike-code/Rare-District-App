@@ -1,11 +1,42 @@
 import { useGetVendorDashboard } from "@workspace/api-client-react";
+import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowUpRight, TrendingUp, Package, ShoppingCart, Activity } from "lucide-react";
 import { Link } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 
 export default function VendorDashboard() {
   const { data: dashboard, isLoading } = useGetVendorDashboard();
+  const { toast } = useToast();
+  const [payoutOpen, setPayoutOpen] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState("");
+  const [payoutPending, setPayoutPending] = useState(false);
+
+  const requestPayout = async () => {
+    const amount = Number(payoutAmount);
+    if (!Number.isFinite(amount) || amount < 1000) {
+      toast({ title: "Minimum payout is ₦1,000", variant: "destructive" });
+      return;
+    }
+    setPayoutPending(true);
+    try {
+      const response = await fetch("/api/vendors/me/payout-request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` },
+        body: JSON.stringify({ amount }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Payout request failed.");
+      toast({ title: "Payout request submitted." });
+      setPayoutAmount("");
+      setPayoutOpen(false);
+    } catch (error) {
+      toast({ title: "Payout request failed", description: error instanceof Error ? error.message : "Try again.", variant: "destructive" });
+    } finally {
+      setPayoutPending(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -61,10 +92,23 @@ export default function VendorDashboard() {
           </CardHeader>
           <CardContent>
             <div className="font-serif text-3xl font-medium">₦{dashboard?.payoutBalance?.toLocaleString() || 0}</div>
-            <button className="text-xs text-primary hover:underline mt-1">Request Payout</button>
+            <button onClick={() => setPayoutOpen((open) => !open)} className="text-xs text-primary hover:underline mt-1">Request Payout</button>
           </CardContent>
         </Card>
       </div>
+
+      {payoutOpen && (
+        <div className="border border-border bg-background p-5">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
+            <label className="flex-1 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              Amount (₦)
+              <input type="number" min="1000" value={payoutAmount} onChange={(event) => setPayoutAmount(event.target.value)} placeholder="1000" className="mt-2 h-11 w-full border border-border bg-transparent px-3 text-sm outline-none focus:border-foreground" />
+            </label>
+            <button onClick={requestPayout} disabled={payoutPending} className="h-11 bg-foreground px-5 text-xs font-bold uppercase tracking-widest text-background disabled:opacity-50">{payoutPending ? "Submitting…" : "Submit request"}</button>
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Requested funds are held until the payout is reviewed.</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div>

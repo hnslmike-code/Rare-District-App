@@ -37,8 +37,8 @@ export default function VendorNewProduct() {
   const { data: profile } = useGetMyVendorProfile();
 
   const [images, setImages] = useState<string[]>([]);
-  // We simulate image upload URL
   const [imageUrlInput, setImageUrlInput] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   const form = useForm<z.infer<typeof productSchema>>({
     resolver: zodResolver(productSchema),
@@ -60,6 +60,33 @@ export default function VendorNewProduct() {
       setImageUrlInput("");
     }
   };
+
+  const uploadImage = async (file: File) => {
+    if (!file.type.startsWith("image/") || file.size > 10_000_000) {
+      toast({ title: "Choose an image under 10MB.", variant: "destructive" });
+      return;
+    }
+    setUploading(true);
+    try {
+      const auth = { Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` };
+      const response = await fetch("/api/storage/uploads/request-url", {
+        method: "POST", headers: { ...auth, "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not prepare upload.");
+      const upload = await fetch(result.uploadURL, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!upload.ok) throw new Error("Image upload failed.");
+      setImages((current) => [...current, result.objectPath]);
+      toast({ title: "Image uploaded." });
+    } catch (error) {
+      toast({ title: "Image upload failed", description: error instanceof Error ? error.message : "Try again.", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const displayImage = (value: string) => value.startsWith("http") || value.startsWith("/") ? value : `/api/storage/objects/${value}`;
 
   const removeImage = (idx: number) => {
     setImages(images.filter((_, i) => i !== idx));
@@ -219,7 +246,7 @@ export default function VendorNewProduct() {
                   {images.map((img, i) => (
                     <div key={i} className="flex items-center gap-3 bg-secondary/50 p-2 border border-border">
                       <div className="w-10 h-10 bg-secondary shrink-0 overflow-hidden">
-                        <img src={img} className="w-full h-full object-cover" />
+                            <img src={displayImage(img)} className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 text-xs truncate text-muted-foreground">{img}</div>
                       <button type="button" onClick={() => removeImage(i)} className="p-1 hover:text-destructive transition-colors">
@@ -229,8 +256,12 @@ export default function VendorNewProduct() {
                   ))}
                   
                   <div className="flex gap-2">
+                    <label className="flex h-10 cursor-pointer items-center border border-border px-3 text-xs uppercase tracking-widest hover:bg-secondary">
+                      {uploading ? "Uploading…" : "Upload"}
+                      <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadImage(file); event.currentTarget.value = ""; }} />
+                    </label>
                     <Input 
-                      placeholder="Image URL" 
+                      placeholder="Or paste image URL" 
                       value={imageUrlInput}
                       onChange={e => setImageUrlInput(e.target.value)}
                       className="h-10 rounded-none border-border bg-transparent text-xs" 
@@ -239,7 +270,7 @@ export default function VendorNewProduct() {
                       <ImagePlus className="w-4 h-4" />
                     </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground">In a full production environment, this would use the pre-signed URL upload flow to GCS.</p>
+                   <p className="text-[10px] text-muted-foreground">Images are validated and uploaded through private object storage.</p>
                 </div>
               </div>
             </div>

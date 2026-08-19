@@ -14,16 +14,21 @@ import {
 
 export default function VendorProducts() {
   const [editing, setEditing] = useState<any>(null);
+  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState("all");
+  const [page, setPage] = useState(1);
   const { data: profile } = useGetMyVendorProfile();
   const vendorId = profile?.id;
 
   const { data: productsData, isLoading } = useListProducts({
     vendorId,
-    limit: 50
+    limit: 20,
+    page,
+    search: search || undefined,
   }, {
     query: {
       enabled: !!vendorId,
-      queryKey: ["vendor-products", vendorId]
+      queryKey: ["vendor-products", vendorId, page, search]
     },
   });
   const updateProduct = useUpdateProduct();
@@ -31,6 +36,7 @@ export default function VendorProducts() {
 
   const queryClient = useQueryClient();
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["vendor-products", vendorId] });
+  const visibleProducts = (productsData?.items ?? []).filter((product) => status === "all" || (status === "active" ? product.isActive : !product.isActive));
   const toggleActive = (product: any) => updateProduct.mutate(
     { id: product.id, data: { isActive: !product.isActive } },
     { onSuccess: refresh },
@@ -52,6 +58,12 @@ export default function VendorProducts() {
             <Plus className="w-4 h-4 mr-2" /> Add Piece
           </Button>
         </Link>
+      </div>
+      <div className="flex flex-col gap-3 border border-border bg-background p-4 sm:flex-row">
+        <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(1); }} placeholder="Search your pieces…" className="h-10 flex-1 border border-border bg-transparent px-3 text-sm outline-none focus:border-foreground" />
+        <select value={status} onChange={(event) => setStatus(event.target.value)} className="h-10 border border-border bg-background px-3 text-sm outline-none">
+          <option value="all">All statuses</option><option value="active">Active</option><option value="archived">Archived</option>
+        </select>
       </div>
 
       <div className="border border-border bg-background overflow-hidden">
@@ -77,14 +89,14 @@ export default function VendorProducts() {
                     <td className="px-6 py-4"><Skeleton className="h-8 w-8 ml-auto" /></td>
                   </tr>
                 ))
-              ) : !productsData?.items || productsData.items.length === 0 ? (
+               ) : visibleProducts.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
                     No pieces in your collection yet.
                   </td>
                 </tr>
               ) : (
-                productsData.items.map((product) => (
+                visibleProducts.map((product) => (
                   <tr key={product.id} className="hover:bg-secondary/20 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-4">
@@ -141,6 +153,12 @@ export default function VendorProducts() {
           </table>
         </div>
       </div>
+      {productsData && productsData.total > 20 && (
+        <div className="flex items-center justify-between text-xs uppercase tracking-widest text-muted-foreground">
+          <span>Page {page} of {Math.ceil(productsData.total / 20)}</span>
+          <div className="flex gap-2"><Button variant="outline" className="h-9 rounded-none text-xs" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>Previous</Button><Button variant="outline" className="h-9 rounded-none text-xs" disabled={page >= Math.ceil(productsData.total / 20)} onClick={() => setPage((current) => current + 1)}>Next</Button></div>
+        </div>
+      )}
       {editing && (
         <VendorProductEditor
           product={editing}

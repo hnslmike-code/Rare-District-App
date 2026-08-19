@@ -6,6 +6,7 @@ import { productsTable } from "./products";
 import { vendorsTable } from "./vendors";
 
 export const orderStatusEnum = pgEnum("order_status", ["pending", "paid", "processing", "shipped", "delivered", "cancelled"]);
+export const fulfillmentStatusEnum = pgEnum("fulfillment_status", ["pending", "processing", "ready_to_ship", "shipped", "delivered", "cancelled", "returned", "refunded"]);
 export const paymentProcessorEnum = pgEnum("payment_processor", ["paystack", "flutterwave"]);
 
 export const ordersTable = pgTable("orders", {
@@ -37,6 +38,10 @@ export const orderItemsTable = pgTable("order_items", {
   commissionRate: numeric("commission_rate", { precision: 5, scale: 2 }).notNull(),
   commissionAmount: numeric("commission_amount", { precision: 12, scale: 2 }).notNull(),
   vendorAmount: numeric("vendor_amount", { precision: 12, scale: 2 }).notNull(),
+  fulfillmentStatus: fulfillmentStatusEnum("fulfillment_status").notNull().default("pending"),
+  trackingNumber: text("tracking_number"),
+  carrier: text("carrier"),
+  shippedAt: timestamp("shipped_at", { withTimezone: true }),
 });
 
 export const insertOrderSchema = createInsertSchema(ordersTable).omit({ id: true, createdAt: true, updatedAt: true });

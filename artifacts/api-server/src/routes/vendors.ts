@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, sql, and, inArray } from "drizzle-orm";
-import { db, vendorsTable, usersTable, productsTable, ordersTable, orderItemsTable, transactionsTable, vendorJoinPageConfigsTable } from "@workspace/db";
+import { db, vendorsTable, usersTable, productsTable, ordersTable, orderItemsTable, transactionsTable, payoutRecordsTable, vendorJoinPageConfigsTable } from "@workspace/db";
 import { ApplyAsVendorBody, UpdateMyVendorProfileBody, GetVendorParams, GetVendorRecentOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { defaultVendorJoinPageContent, normalizeVendorJoinPageContent } from "../lib/vendor-join-content";
@@ -221,6 +221,10 @@ router.get("/vendors/dashboard/recent-orders", requireAuth, async (req, res): Pr
       commissionRate: orderItemsTable.commissionRate,
       commissionAmount: orderItemsTable.commissionAmount,
       vendorAmount: orderItemsTable.vendorAmount,
+      fulfillmentStatus: orderItemsTable.fulfillmentStatus,
+      trackingNumber: orderItemsTable.trackingNumber,
+      carrier: orderItemsTable.carrier,
+      shippedAt: orderItemsTable.shippedAt,
       productName: productsTable.name,
       productImages: productsTable.images,
     }).from(orderItemsTable)
@@ -237,11 +241,118 @@ router.get("/vendors/dashboard/recent-orders", requireAuth, async (req, res): Pr
         quantity: item.quantity, selectedSize: item.selectedSize,
         unitPrice: parseFloat(item.unitPrice), commissionRate: parseFloat(item.commissionRate),
         commissionAmount: parseFloat(item.commissionAmount), vendorAmount: parseFloat(item.vendorAmount),
+        fulfillmentStatus: item.fulfillmentStatus, trackingNumber: item.trackingNumber,
+        carrier: item.carrier, shippedAt: item.shippedAt,
         product: item.productName ? { id: item.productId, name: item.productName, images: item.productImages ?? [] } : undefined,
       })),
     };
   }));
   res.json(result);
+});
+
+// PATCH /vendors/orders/:orderId/items/:itemId/fulfillment
+router.patch("/vendors/orders/:orderId/items/:itemId/fulfillment", requireAuth, async (req, res): Promise<void> => {
+  const vendor = await getApprovedVendor(req.user!.userId);
+  const orderId = Number(req.params.orderId);
+  const itemId = Number(req.params.itemId);
+  const status = req.body?.status;
+  const allowed = ["pending", "processing", "ready_to_ship", "shipped", "delivered", "cancelled", "returned", "refunded"];
+  if (!vendor || !Number.isInteger(orderId) || !Number.isInteger(itemId)) {
+    res.status(403).json({ error: "Approved vendor access is required." });
+    return;
+  }
+  if (!allowed.includes(status)) {
+    res.status(400).json({ error: "Invalid fulfillment status." });
+    return;
+  }
+  const [item] = await db.select().from(orderItemsTable).where(and(
+    eq(orderItemsTable.id, itemId), eq(orderItemsTable.orderId, orderId), eq(orderItemsTable.vendorId, vendor.id),
+  ));
+  if (!item) {
+    res.status(404).json({ error: "Fulfillment item not found." });
+    return;
+  }
+  const transitions: Record<string, string[]> = {
+    pending: ["processing", "cancelled"],
+    processing: ["ready_to_ship", "cancelled"],
+    ready_to_ship: ["shipped"],
+    shipped: ["delivered", "returned"],
+    delivered: ["returned", "refunded"],
+    cancelled: [],
+    returned: ["refunded"],
+    refunded: [],
+  };
+  if (!transitions[item.fulfillmentStatus]?.includes(status)) {
+    res.status(409).json({ error: `Cannot move this item from ${item.fulfillmentStatus} to ${status}.` });
+    return;
+  }
+  const trackingNumber = typeof req.body?.trackingNumber === "string" ? req.body.trackingNumber.trim().slice(0, 120) : undefined;
+  const carrier = typeof req.body?.carrier === "string" ? req.body.carrier.trim().slice(0, 80) : undefined;
+  if (status === "shipped" && !trackingNumber) {
+    res.status(400).json({ error: "Tracking number is required before shipping." });
+    return;
+  }
+  const [updated] = await db.update(orderItemsTable).set({
+    fulfillmentStatus: status as typeof item.fulfillmentStatus,
+    trackingNumber: trackingNumber ?? item.trackingNumber,
+    carrier: carrier ?? item.carrier,
+    shippedAt: status === "shipped" ? new Date() : item.shippedAt,
+  }).where(eq(orderItemsTable.id, item.id)).returning();
+  res.json({
+    id: updated.id, orderId: updated.orderId, productId: updated.productId,
+    fulfillmentStatus: updated.fulfillmentStatus, trackingNumber: updated.trackingNumber,
+    carrier: updated.carrier, shippedAt: updated.shippedAt,
+  });
+});
+
+// POST /vendors/me/payout-request
+router.post("/vendors/me/payout-request", requireAuth, async (req, res): Promise<void> => {
+  const vendor = await getApprovedVendor(req.user!.userId);
+  if (!vendor) {
+    res.status(403).json({ error: "Vendor approval is required to request payouts." });
+    return;
+  }
+  const amount = typeof req.body?.amount === "number" ? req.body.amount : Number(req.body?.amount);
+  if (!Number.isFinite(amount) || amount < 1000) {
+    res.status(400).json({ error: "Payout requests must be at least ₦1,000." });
+    return;
+  }
+  const [debited] = await db.update(vendorsTable)
+    .set({ payoutBalance: sql`${vendorsTable.payoutBalance} - ${amount}` })
+    .where(and(eq(vendorsTable.id, vendor.id), sql`${vendorsTable.payoutBalance} >= ${amount}`))
+    .returning({ id: vendorsTable.id });
+  if (!debited) {
+    res.status(409).json({ error: "Requested amount is greater than your available balance." });
+    return;
+  }
+  const [record] = await db.insert(payoutRecordsTable).values({
+    vendorId: vendor.id,
+    amount: String(amount),
+    status: "pending",
+    note: typeof req.body?.note === "string" ? req.body.note.slice(0, 500) : null,
+  }).returning();
+  res.status(201).json({
+    id: record.id, amount: Number(record.amount), status: record.status,
+    reference: record.reference, createdAt: record.createdAt,
+  });
+});
+
+// GET /vendors/me/payouts
+router.get("/vendors/me/payouts", requireAuth, async (req, res): Promise<void> => {
+  const vendor = await getApprovedVendor(req.user!.userId);
+  if (!vendor) {
+    res.status(403).json({ error: "Vendor approval is required to view payouts." });
+    return;
+  }
+  const records = await db.select().from(payoutRecordsTable)
+    .where(eq(payoutRecordsTable.vendorId, vendor.id))
+    .orderBy(desc(payoutRecordsTable.createdAt))
+    .limit(100);
+  res.json(records.map(record => ({
+    id: record.id, amount: Number(record.amount), status: record.status,
+    reference: record.reference, createdAt: record.createdAt,
+    reviewedAt: record.reviewedAt, paidAt: record.paidAt,
+  })));
 });
 
 // GET /vendors/:id
