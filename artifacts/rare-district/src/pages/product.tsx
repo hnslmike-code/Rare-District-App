@@ -136,7 +136,7 @@ export default function ProductDetail() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20">
           
           {/* Image Gallery */}
-          <div className="lg:col-span-7 flex flex-col-reverse md:flex-row gap-4 h-fit sticky top-28">
+          <div className="lg:col-span-7 flex flex-col-reverse md:flex-row gap-4 h-fit lg:sticky lg:top-28">
             {/* Thumbnails */}
             {product.images && product.images.length > 1 && (
               <div className="flex md:flex-col gap-4 overflow-x-auto md:w-24 shrink-0 no-scrollbar">
