@@ -133,12 +133,12 @@ export function ProductCard({ product, dataTestId, showWardrobe = true }: Produc
       {/* Info */}
       <Link href={`/product/${product.id}`} className="block space-y-1 mt-4" data-testid={`link-product-info-${product.id}`}>
         {product.vendor && (
-          <p className="text-xs font-bold tracking-widest uppercase text-muted-foreground">{product.vendor.brandName}</p>
+         <p className="product-card-vendor text-xs font-bold tracking-widest uppercase text-muted-foreground">{product.vendor.brandName}</p>
         )}
-        <p className="text-sm font-medium leading-snug line-clamp-2">{product.name}</p>
-        <p className="font-serif text-base font-medium text-primary">{product.currency || "₦"} {product.price.toLocaleString()}</p>
+        <p className="product-card-name text-sm font-medium leading-snug line-clamp-2">{product.name}</p>
+        <p className="product-card-price font-serif text-base font-medium text-primary">{product.currency || "₦"} {product.price.toLocaleString()}</p>
         {product.sizes && product.sizes.length > 0 && (
-          <p className="text-xs text-muted-foreground">{product.sizes.slice(0, 4).join(" · ")}{product.sizes.length > 4 ? " ···" : ""}</p>
+          <p className="product-card-sizes text-xs text-muted-foreground">{product.sizes.slice(0, 4).join(" · ")}{product.sizes.length > 4 ? " ···" : ""}</p>
         )}
       </Link>
     </article>
