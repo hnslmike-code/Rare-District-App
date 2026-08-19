@@ -10,3 +10,4 @@ export * from "./reviews";
 export * from "./admin";
 export * from "./wardrobe";
 export * from "./vendor-operations";
+export * from "./media";

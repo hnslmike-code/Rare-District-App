@@ -13,6 +13,7 @@ import reviewsRouter from "./reviews";
 import storefrontRouter from "./storefront";
 import adminRouter from "./admin";
 import storageRouter from "./storage";
+import mediaRouter from "./media";
 import vendorOperationsRouter from "./vendor-operations";
 
 const router: IRouter = Router();
@@ -31,6 +32,7 @@ router.use(reviewsRouter);
 router.use(storefrontRouter);
 router.use(adminRouter);
 router.use(storageRouter);
+router.use(mediaRouter);
 router.use(vendorOperationsRouter);
 
 export default router;
