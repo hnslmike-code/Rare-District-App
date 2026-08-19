@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Link } from "wouter";
 import { useAddToWardrobe, useGetStorefrontSummary, useListProducts } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
@@ -34,6 +34,62 @@ type HomepageContent = {
   carousel: { eyebrow: string; title: string; productIds: number[]; autoplay: boolean };
   sections: { latest: boolean; editorial: boolean; designers: boolean };
 };
+
+type BrandVendor = {
+  id: number;
+  brandName: string;
+  logoUrl?: string | null;
+  description?: string | null;
+};
+
+function brandMonogram(brandName: string) {
+  const words = brandName.split(/\s+/).filter(Boolean);
+  return words.length > 1
+    ? `${words[0][0]}${words[1][0]}`.toUpperCase()
+    : brandName.slice(0, 2).toUpperCase();
+}
+
+function BrandDirectory({ vendors }: { vendors: BrandVendor[] }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const node = sectionRef.current;
+    if (!node || typeof IntersectionObserver === "undefined") {
+      setIsVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setIsVisible(true);
+        observer.disconnect();
+      }
+    }, { threshold: 0.16 });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={sectionRef} className={`brand-directory ${isVisible ? "is-visible" : ""}`}>
+      <div className="brand-directory-track">
+        {vendors.map((vendor, index) => (
+          <Link
+            key={vendor.id}
+            href={`/vendor/${vendor.id}`}
+            className="brand-orb-item"
+            style={{ "--brand-index": index } as CSSProperties}
+            aria-label={`Visit ${vendor.brandName}`}
+          >
+            <span className="brand-orb">
+              {vendor.logoUrl ? <img src={vendor.logoUrl} alt="" /> : <span>{brandMonogram(vendor.brandName)}</span>}
+            </span>
+            <span className="brand-orb-name">{vendor.brandName}</span>
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function imageUrl(product?: Product) {
   const image = product?.images?.[0];
@@ -267,9 +323,9 @@ export default function Home() {
 
       {(content?.sections.editorial ?? true) && <section className="editorial-band"><div className="editorial-band-inner container mx-auto px-4 py-20 md:px-6 md:py-28"><div className="editorial-band-copy"><p className="eyebrow">The house edit</p><h2>Find the brand<br /><em>before the trend.</em></h2><div className="editorial-band-body"><p>Rare District brings the ateliers, cult labels, and emerging voices of contemporary African fashion into one considered marketplace.</p><Link href="/shop?category=designers" className="editorial-band-link">Meet the designers <ArrowRight className="h-4 w-4" /></Link></div></div></div></section>}
 
-      {(content?.sections.designers ?? true) && <section className="container mx-auto px-4 py-20 md:px-6 md:py-28">
+      {(content?.sections.designers ?? true) && <section className="brand-directory-section container mx-auto px-4 py-20 md:px-6 md:py-28">
         <div className="section-heading"><div><p className="eyebrow">The ateliers</p><h2>Start with a name.</h2></div><Link href="/shop?category=designers" className="text-xs font-bold uppercase tracking-[0.2em] hover:underline">View all <ArrowRight className="ml-2 inline h-3.5 w-3.5" /></Link></div>
-        <div className="grid gap-5 md:grid-cols-3">{summary?.featuredVendors?.slice(0, 3).map((vendor) => <Link key={vendor.id} href={`/vendor/${vendor.id}`} className="vendor-tile"><div className="vendor-tile-mark">{vendor.logoUrl ? <img src={vendor.logoUrl} alt="" /> : vendor.brandName.charAt(0)}</div><div><p className="eyebrow">{vendor.description || "Independent atelier"}</p><h3>{vendor.brandName}</h3></div><ArrowRight className="h-4 w-4" /></Link>)}</div>
+        <BrandDirectory vendors={(summary?.featuredVendors ?? []) as BrandVendor[]} />
       </section>}
       <QuickAddDrawer product={quickAdd} onClose={() => setQuickAdd(null)} />
     </div>

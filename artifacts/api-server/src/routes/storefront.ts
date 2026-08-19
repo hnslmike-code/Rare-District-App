@@ -51,7 +51,7 @@ router.get("/storefront/summary", async (_req, res): Promise<void> => {
     db.select().from(productsTable).where(and(eq(productsTable.isFeatured, true), eq(productsTable.isActive, true))).orderBy(desc(productsTable.createdAt)).limit(8),
     db.select().from(productsTable).where(eq(productsTable.isActive, true)).orderBy(desc(productsTable.wardrobeCount)).limit(8),
     db.select().from(categoriesTable).orderBy(categoriesTable.name),
-    db.select().from(vendorsTable).where(eq(vendorsTable.status, "approved")).orderBy(desc(vendorsTable.createdAt)).limit(6),
+    db.select().from(vendorsTable).where(eq(vendorsTable.status, "approved")).orderBy(desc(vendorsTable.createdAt)).limit(12),
   ]);
 
   const formatProduct = (p: typeof productsTable.$inferSelect) => ({
