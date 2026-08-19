@@ -16,6 +16,25 @@ import {
 
 const router: IRouter = Router();
 
+export async function releaseOrderInventory(orderId: number, status: "cancelled" = "cancelled") {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM orders WHERE id = ${orderId} FOR UPDATE`);
+    const [order] = await tx.select().from(ordersTable).where(eq(ordersTable.id, orderId));
+    if (!order || order.inventoryReleasedAt) return order;
+    const items = await tx.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, orderId));
+    for (const item of items) {
+      await tx.update(productsTable)
+        .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
+        .where(eq(productsTable.id, item.productId));
+    }
+    const [updated] = await tx.update(ordersTable)
+      .set({ status, inventoryReleasedAt: new Date() })
+      .where(eq(ordersTable.id, orderId))
+      .returning();
+    return updated;
+  });
+}
+
 async function formatOrder(order: typeof ordersTable.$inferSelect) {
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
   const formattedItems = await Promise.all(items.map(async (item) => {
@@ -188,7 +207,13 @@ router.patch("/orders/:id/status", requireAuth, async (req, res): Promise<void> 
     return;
   }
 
-  const [updated] = await db.update(ordersTable).set({ status: parsed.data.status }).where(eq(ordersTable.id, order.id)).returning();
+  const updated = parsed.data.status === "cancelled"
+    ? await releaseOrderInventory(order.id)
+    : (await db.update(ordersTable).set({ status: parsed.data.status }).where(eq(ordersTable.id, order.id)).returning())[0];
+  if (!updated) {
+    res.status(409).json({ error: "Order could not be updated." });
+    return;
+  }
   res.json(await formatOrder(updated));
 });
 

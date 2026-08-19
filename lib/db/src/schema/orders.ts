@@ -23,6 +23,7 @@ export const ordersTable = pgTable("orders", {
   couponCode: text("coupon_code"),
   paymentProcessor: paymentProcessorEnum("payment_processor"),
   paymentReference: text("payment_reference"),
+  inventoryReleasedAt: timestamp("inventory_released_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

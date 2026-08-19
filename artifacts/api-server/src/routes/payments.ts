@@ -3,6 +3,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, transactionsTable, vendorsTable } from "@workspace/db";
 import { InitiatePaystackPaymentBody, InitiateFlutterwavePaymentBody, VerifyPaystackPaymentBody, VerifyFlutterwavePaymentBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
+import { releaseOrderInventory } from "./orders";
 import { canAccessCustomerOrder } from "../lib/security-boundaries";
 
 const router: IRouter = Router();
@@ -157,6 +158,7 @@ router.post("/payments/paystack/verify", requireAuth, async (req, res): Promise<
       await settlePaidOrder(order, "paystack", parsed.data.reference);
       res.json({ success: true, status: "paid", orderId: order.id, amount: parseFloat(order.totalAmount), reference: parsed.data.reference });
     } else {
+      await releaseOrderInventory(order.id);
       res.json({ success: false, status: "failed", orderId: order.id, amount: 0, reference: parsed.data.reference });
     }
   } catch (err) {
@@ -191,6 +193,7 @@ router.post("/payments/flutterwave/verify", requireAuth, async (req, res): Promi
       await settlePaidOrder(order, "flutterwave", parsed.data.reference);
       res.json({ success: true, status: "paid", orderId: order.id, amount: parseFloat(order.totalAmount), reference: parsed.data.reference });
     } else {
+      await releaseOrderInventory(order.id);
       res.json({ success: false, status: "failed", orderId: order.id, amount: 0, reference: parsed.data.reference });
     }
   } catch (err) {
