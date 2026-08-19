@@ -35,6 +35,9 @@ import VendorProducts from '@/pages/vendor-dashboard/products/index';
 import VendorNewProduct from '@/pages/vendor-dashboard/products/new';
 import VendorOrders from '@/pages/vendor-dashboard/orders';
 import VendorSettings from '@/pages/vendor-dashboard/settings';
+import VendorInventory from '@/pages/vendor-dashboard/inventory';
+import VendorReturns from '@/pages/vendor-dashboard/returns';
+import VendorWorkspace from '@/pages/vendor-dashboard/workspace';
 
 // Admin
 import AdminLogin from '@/pages/admin/login';
@@ -156,6 +159,11 @@ function Router() {
       <Route path="/vendor-dashboard/products/new" component={() => <VendorRoute component={VendorNewProduct} />} />
       <Route path="/vendor-dashboard/products" component={() => <VendorRoute component={VendorProducts} />} />
       <Route path="/vendor-dashboard/orders" component={() => <VendorRoute component={VendorOrders} />} />
+      <Route path="/vendor-dashboard/inventory" component={() => <VendorRoute component={VendorInventory} />} />
+      <Route path="/vendor-dashboard/returns" component={() => <VendorRoute component={VendorReturns} />} />
+      <Route path="/vendor-dashboard/payouts" component={() => <VendorRoute component={() => <VendorWorkspace section="payouts" />} />} />
+      <Route path="/vendor-dashboard/analytics" component={() => <VendorRoute component={() => <VendorWorkspace section="analytics" />} />} />
+      <Route path="/vendor-dashboard/notifications" component={() => <VendorRoute component={() => <VendorWorkspace section="notifications" />} />} />
       <Route path="/vendor-dashboard/settings" component={() => <VendorRoute component={VendorSettings} />} />
       <Route path="/vendor-dashboard" component={() => <VendorRoute component={VendorDashboard} />} />
 

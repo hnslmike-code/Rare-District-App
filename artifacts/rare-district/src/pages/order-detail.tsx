@@ -1,12 +1,19 @@
 import { Link, useRoute } from "wouter";
+import { useState } from "react";
 import { useGetOrder } from "@workspace/api-client-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
 import { ArrowLeft, MapPin, Truck, CreditCard } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 export default function OrderDetail() {
   const [, params] = useRoute("/orders/:id");
   const id = Number(params?.id);
+  const { toast } = useToast();
+  const [returningItemId, setReturningItemId] = useState<number | null>(null);
+  const [returnReason, setReturnReason] = useState("wrong_item");
+  const [returnDescription, setReturnDescription] = useState("");
+  const [returnSubmitting, setReturnSubmitting] = useState(false);
 
   const { data: order, isLoading } = useGetOrder(id, {
     query: {
@@ -48,6 +55,23 @@ export default function OrderDetail() {
   }
 
   const subtotal = order.totalAmount + (order.discountAmount || 0);
+  const submitReturn = async (itemId: number) => {
+    setReturnSubmitting(true);
+    try {
+      const response = await fetch("/api/returns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("token") ?? ""}` },
+        body: JSON.stringify({ orderId: order.id, orderItemId: itemId, reason: returnReason, description: returnDescription }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Return request failed.");
+      toast({ title: "Return request submitted.", description: "The vendor has 48 hours to respond." });
+      setReturningItemId(null);
+      setReturnDescription("");
+    } catch (error) {
+      toast({ title: "Return request failed", description: error instanceof Error ? error.message : "Try again.", variant: "destructive" });
+    } finally { setReturnSubmitting(false); }
+  };
 
   return (
     <div className="bg-background pt-8 pb-32">
@@ -133,8 +157,22 @@ export default function OrderDetail() {
                   <div className="text-right">
                     <p className="text-lg font-light mb-1">₦{(item.unitPrice * item.quantity).toLocaleString()}</p>
                     <p className="text-xs text-muted-foreground">Qty: {item.quantity} × ₦{item.unitPrice.toLocaleString()}</p>
+                    {["delivered", "shipped"].includes(order.status) && (
+                      <button onClick={() => setReturningItemId(returningItemId === item.id ? null : item.id)} className="mt-4 text-xs font-bold uppercase tracking-widest text-muted-foreground underline">Request return</button>
+                    )}
                   </div>
                 </div>
+                {returningItemId === item.id && (
+                  <div className="mt-5 border-t border-dashed border-border pt-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Eligible reasons</p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button onClick={() => setReturnReason("wrong_item")} className={`border px-3 py-2 text-xs ${returnReason === "wrong_item" ? "border-foreground bg-secondary" : "border-border"}`}>Wrong item received</button>
+                      <button onClick={() => setReturnReason("damaged")} className={`border px-3 py-2 text-xs ${returnReason === "damaged" ? "border-foreground bg-secondary" : "border-border"}`}>Damaged or defective</button>
+                    </div>
+                    <textarea value={returnDescription} onChange={event => setReturnDescription(event.target.value)} placeholder="Tell the vendor what happened…" className="mt-3 min-h-20 w-full border border-border bg-transparent p-3 text-sm outline-none focus:border-foreground" />
+                    <div className="mt-3 flex justify-end"><button onClick={() => submitReturn(item.id)} disabled={returnSubmitting} className="bg-foreground px-4 py-2 text-xs font-bold uppercase tracking-widest text-background disabled:opacity-50">{returnSubmitting ? "Submitting…" : "Submit request"}</button></div>
+                  </div>
+                )}
               </div>
             </div>
           ))}

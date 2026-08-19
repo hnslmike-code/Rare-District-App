@@ -9,3 +9,4 @@ export * from "./referrals";
 export * from "./reviews";
 export * from "./admin";
 export * from "./wardrobe";
+export * from "./vendor-operations";

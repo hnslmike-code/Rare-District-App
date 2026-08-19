@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, gte, sql } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, productsTable, vendorsTable, transactionsTable, adminSettingsTable } from "@workspace/db";
+import { db, ordersTable, orderItemsTable, productsTable, vendorsTable, transactionsTable, adminSettingsTable, inventoryReservationTable } from "@workspace/db";
 import { CreateOrderBody, GetOrderParams, UpdateOrderStatusParams, UpdateOrderStatusBody, ListOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import {
@@ -115,11 +115,36 @@ export async function releaseOrderInventory(orderId: number, status: "cancelled"
         await recordOrderItemLedgerEntry(tx, order, item, "reversal");
       }
     }
+    await tx.update(inventoryReservationTable).set({ status: "released", releasedAt: new Date() }).where(and(
+      eq(inventoryReservationTable.orderId, orderId),
+      eq(inventoryReservationTable.status, "active"),
+    ));
     const [updated] = await tx.update(ordersTable)
       .set({ status, inventoryReleasedAt: order.inventoryReleasedAt ?? new Date() })
       .where(eq(ordersTable.id, orderId))
       .returning();
     return updated;
+  });
+}
+
+export async function expireInventoryReservations() {
+  return db.transaction(async tx => {
+    const expired = await tx.select().from(inventoryReservationTable).where(and(
+      eq(inventoryReservationTable.status, "active"),
+      sql`${inventoryReservationTable.expiresAt} <= now()`,
+    ));
+    for (const reservation of expired) {
+      await tx.execute(sql`SELECT id FROM inventory_reservations WHERE id = ${reservation.id} FOR UPDATE`);
+      const [stillActive] = await tx.select().from(inventoryReservationTable).where(and(
+        eq(inventoryReservationTable.id, reservation.id),
+        eq(inventoryReservationTable.status, "active"),
+      ));
+      if (!stillActive) continue;
+      await tx.update(productsTable).set({ stock: sql`${productsTable.stock} + ${reservation.quantity}` }).where(eq(productsTable.id, reservation.productId));
+      await tx.update(inventoryReservationTable).set({ status: "expired", releasedAt: new Date() }).where(eq(inventoryReservationTable.id, reservation.id));
+      await tx.update(ordersTable).set({ status: "cancelled", inventoryReleasedAt: new Date() }).where(and(eq(ordersTable.id, reservation.orderId), eq(ordersTable.status, "pending")));
+    }
+    return expired.length;
   });
 }
 
@@ -177,6 +202,7 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
   }
 
   try {
+    await expireInventoryReservations();
     const order = await db.transaction(async (tx) => {
       const settings = await tx.select().from(adminSettingsTable).limit(1);
       const commissionRate = settings[0] ? parseFloat(settings[0].defaultCommissionRate) : 5;
@@ -211,11 +237,15 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
         shippingPhone: parsed.data.shippingPhone, couponCode: parsed.data.couponCode ?? null,
       }).returning();
       for (const item of orderItems) {
-        await tx.insert(orderItemsTable).values({
+        const [createdItem] = await tx.insert(orderItemsTable).values({
           orderId: created.id, productId: item.productId, vendorId: item.vendorId,
           quantity: item.quantity, selectedSize: item.selectedSize ?? null,
           unitPrice: String(item.unitPrice), commissionRate: String(item.commissionRate),
           commissionAmount: String(item.commissionAmount), vendorAmount: String(item.vendorAmount),
+        }).returning({ id: orderItemsTable.id });
+        await tx.insert(inventoryReservationTable).values({
+          orderId: created.id, orderItemId: createdItem.id, productId: item.productId,
+          quantity: item.quantity, expiresAt: new Date(Date.now() + 30 * 60 * 1000),
         });
       }
       return created;

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, ordersTable, orderItemsTable, transactionsTable } from "@workspace/db";
+import { db, ordersTable, orderItemsTable, transactionsTable, inventoryReservationTable } from "@workspace/db";
 import { InitiatePaystackPaymentBody, InitiateFlutterwavePaymentBody, VerifyPaystackPaymentBody, VerifyFlutterwavePaymentBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { releaseOrderInventory, recordOrderItemLedgerEntry } from "./orders";
@@ -28,6 +28,10 @@ async function settlePaidOrder(order: typeof ordersTable.$inferSelect, processor
     if (existing) return false;
 
     await tx.update(ordersTable).set({ status: "paid" }).where(eq(ordersTable.id, order.id));
+    await tx.update(inventoryReservationTable).set({ status: "consumed" }).where(and(
+      eq(inventoryReservationTable.orderId, order.id),
+      eq(inventoryReservationTable.status, "active"),
+    ));
     const items = await tx.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
     for (const item of items) {
       // Inventory and fulfillment were already unwound before payment settled;

@@ -13,6 +13,10 @@ import {
   Tag,
   Image,
   Activity,
+  Boxes,
+  RotateCcw,
+  BarChart3,
+  Bell,
   Menu,
   X,
 } from "lucide-react";
@@ -34,10 +38,15 @@ export function DashboardLayout({
   };
 
   const vendorLinks = [
-    { href: "/vendor-dashboard", label: "Overview", icon: LayoutDashboard },
-    { href: "/vendor-dashboard/products", label: "Products", icon: Package },
-    { href: "/vendor-dashboard/orders", label: "Orders", icon: ShoppingCart },
-    { href: "/vendor-dashboard/settings", label: "Profile & Settings", icon: Settings },
+    { href: "/vendor-dashboard", label: "Overview", icon: LayoutDashboard, group: "Workspace" },
+    { href: "/vendor-dashboard/products", label: "Catalog", icon: Package, group: "Workspace" },
+    { href: "/vendor-dashboard/orders", label: "Orders & Fulfillment", icon: ShoppingCart, group: "Workspace" },
+    { href: "/vendor-dashboard/inventory", label: "Inventory", icon: Boxes, group: "Workspace" },
+    { href: "/vendor-dashboard/returns", label: "Returns & Refunds", icon: RotateCcw, group: "Workspace" },
+    { href: "/vendor-dashboard/payouts", label: "Payouts", icon: CreditCard, group: "Workspace" },
+    { href: "/vendor-dashboard/analytics", label: "Analytics", icon: BarChart3, group: "Workspace" },
+    { href: "/vendor-dashboard/notifications", label: "Notifications", icon: Bell, group: "Workspace" },
+    { href: "/vendor-dashboard/settings", label: "Settings", icon: Settings, group: "Account" },
   ];
 
   const adminLinks = [
@@ -87,25 +96,29 @@ export function DashboardLayout({
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.2em] mb-4">
           {isAdmin ? "Admin Panel" : "Vendor Dashboard"}
         </p>
-        <nav className="space-y-1">
-          {links.map((link) => {
+          <nav className="space-y-1">
+          {links.map((link, index) => {
             const active = isActive(link.href);
             const Icon = link.icon;
+            const group = (link as { group?: string }).group;
+            const previousGroup = index > 0 ? (links[index - 1] as { group?: string }).group : undefined;
             return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileSidebarOpen(false)}
-               className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-l-2 ${
-                  active
-                     ? "bg-primary/12 text-primary border-primary"
-                     : "text-foreground border-transparent hover:bg-secondary hover:text-primary"
-                }`}
-                data-testid={`link-dashboard-${link.label.toLowerCase().replace(/\s+/g, "-")}`}
-              >
-                <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={active ? 2 : 1.5} />
-                {link.label}
-              </Link>
+              <div key={link.href}>
+                {(!isAdmin && (index === 0 || group !== previousGroup)) && (
+                  <p className="mb-2 mt-6 px-4 text-[9px] font-bold uppercase tracking-[0.2em] text-muted-foreground first:mt-0">{group}</p>
+                )}
+                <Link
+                  href={link.href}
+                  onClick={() => setMobileSidebarOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 text-sm font-medium transition-colors border-l-2 ${
+                    active ? "bg-primary/12 text-primary border-primary" : "text-foreground border-transparent hover:bg-secondary hover:text-primary"
+                  }`}
+                  data-testid={`link-dashboard-${link.label.toLowerCase().replace(/\s+/g, "-")}`}
+                >
+                  <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={active ? 2 : 1.5} />
+                  {link.label}
+                </Link>
+              </div>
             );
           })}
         </nav>
