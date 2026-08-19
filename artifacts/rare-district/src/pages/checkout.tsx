@@ -6,6 +6,7 @@ import { useLocation } from "wouter";
 import { 
   useGetWardrobe, 
   useCreateOrder, 
+  useInitiatePaystackPayment,
   useValidateCoupon, 
   getGetWardrobeQueryKey,
 } from "@workspace/api-client-react";
@@ -23,6 +24,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, Tag, CreditCard, ShieldCheck } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const checkoutSchema = z.object({
   shippingAddress: z.string().min(5, "Address is required"),
@@ -37,6 +39,7 @@ export default function Checkout() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { currentUser } = useAuth();
 
   const [couponApplied, setCouponApplied] = useState<{ code: string, discount: number } | null>(null);
 
@@ -60,6 +63,7 @@ export default function Checkout() {
   });
 
   const createOrderMutation = useCreateOrder();
+  const initiatePaystackMutation = useInitiatePaystackPayment();
   const validateCouponMutation = useValidateCoupon();
 
   const items = wardrobeItems || [];
@@ -116,8 +120,40 @@ export default function Checkout() {
     }, {
       onSuccess: (order) => {
         queryClient.invalidateQueries({ queryKey: getGetWardrobeQueryKey() });
-        toast({ title: "Order Placed", description: "Your order has been secured." });
-        setLocation(`/orders/${order.id}`); // Or direct to payment init if real integration
+
+          if (values.paymentMethod === "paystack") {
+            if (!currentUser?.email) {
+              toast({
+                title: "Payment unavailable",
+                description: "Your account email is required to start Paystack checkout.",
+                variant: "destructive",
+              });
+              return;
+            }
+
+            initiatePaystackMutation.mutate({
+              data: {
+                orderId: order.id,
+                email: currentUser.email,
+                callbackUrl: `${window.location.origin}/orders/${order.id}`,
+              },
+            }, {
+              onSuccess: (payment) => {
+                window.location.assign(payment.paymentUrl);
+              },
+              onError: (err: any) => {
+                toast({
+                  title: "Paystack checkout failed",
+                  description: err?.message || "Could not start Paystack checkout. Your order is still pending.",
+                  variant: "destructive",
+                });
+              },
+            });
+            return;
+          }
+
+          toast({ title: "Order Placed", description: "Your order has been secured." });
+          setLocation(`/orders/${order.id}`);
       },
       onError: (err: any) => {
         toast({ title: "Checkout Failed", description: err?.message || "Could not complete your order.", variant: "destructive" });
@@ -250,11 +286,11 @@ export default function Checkout() {
 
               <Button 
                 type="submit" 
-                disabled={createOrderMutation.isPending}
+                disabled={createOrderMutation.isPending || initiatePaystackMutation.isPending}
                 className="w-full h-16 rounded-none font-bold tracking-widest uppercase text-sm group"
               >
-                {createOrderMutation.isPending ? "Processing..." : "Confirm & Pay"}
-                {!createOrderMutation.isPending && <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />}
+                {createOrderMutation.isPending || initiatePaystackMutation.isPending ? "Processing..." : "Confirm & Pay"}
+                {!createOrderMutation.isPending && !initiatePaystackMutation.isPending && <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />}
               </Button>
 
             </form>
