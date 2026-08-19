@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, productsTable, vendorsTable, adminSettingsTable } from "@workspace/db";
 import { CreateOrderBody, GetOrderParams, UpdateOrderStatusParams, UpdateOrderStatusBody, ListOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
@@ -59,68 +59,55 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
     return;
   }
 
-  // Get commission rate from settings
-  const settings = await db.select().from(adminSettingsTable).limit(1);
-  const commissionRate = settings[0] ? parseFloat(settings[0].defaultCommissionRate) : 5;
+  try {
+    const order = await db.transaction(async (tx) => {
+      const settings = await tx.select().from(adminSettingsTable).limit(1);
+      const commissionRate = settings[0] ? parseFloat(settings[0].defaultCommissionRate) : 5;
+      let totalAmount = 0;
+      const orderItems: Array<{ productId: number; vendorId: number; quantity: number; selectedSize?: string; unitPrice: number; commissionRate: number; commissionAmount: number; vendorAmount: number }> = [];
 
-  // Calculate order items
-  let totalAmount = 0;
-  const orderItems: Array<{ productId: number; vendorId: number; quantity: number; selectedSize?: string; unitPrice: number; commissionRate: number; commissionAmount: number; vendorAmount: number }> = [];
+      for (const item of parsed.data.items) {
+        // The conditional update is the reservation: concurrent checkouts
+        // cannot both decrement the same final unit.
+        const [product] = await tx.select().from(productsTable).where(eq(productsTable.id, item.productId));
+        if (!product || !product.isActive) throw new Error(`Product ${item.productId} is unavailable.`);
+        const unitPrice = parseFloat(product.price);
+        const lineTotal = unitPrice * item.quantity;
+        const commissionAmount = lineTotal * (commissionRate / 100);
+        const vendorAmount = lineTotal - commissionAmount;
+        totalAmount += lineTotal;
+        const [reserved] = await tx.update(productsTable)
+          .set({ stock: sql`${productsTable.stock} - ${item.quantity}` })
+          .where(and(eq(productsTable.id, item.productId), gte(productsTable.stock, item.quantity), eq(productsTable.isActive, true)))
+          .returning({ id: productsTable.id });
+        if (!reserved) throw new Error(`${product.name} does not have enough stock.`);
+        orderItems.push({
+          productId: item.productId, vendorId: product.vendorId, quantity: item.quantity,
+          selectedSize: item.selectedSize, unitPrice, commissionRate, commissionAmount, vendorAmount,
+        });
+      }
 
-  for (const item of parsed.data.items) {
-    const [product] = await db.select().from(productsTable).where(eq(productsTable.id, item.productId));
-    if (!product) {
-      res.status(404).json({ error: `Product ${item.productId} not found` });
-      return;
-    }
-    const unitPrice = parseFloat(product.price);
-    const lineTotal = unitPrice * item.quantity;
-    const commissionAmount = lineTotal * (commissionRate / 100);
-    const vendorAmount = lineTotal - commissionAmount;
-    totalAmount += lineTotal;
-
-    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, product.vendorId));
-    orderItems.push({
-      productId: item.productId,
-      vendorId: vendor?.id ?? product.vendorId,
-      quantity: item.quantity,
-      selectedSize: item.selectedSize,
-      unitPrice,
-      commissionRate,
-      commissionAmount,
-      vendorAmount,
+      const [created] = await tx.insert(ordersTable).values({
+        userId: req.user!.userId, status: "pending", totalAmount: String(totalAmount),
+        discountAmount: "0", currency: "NGN", shippingAddress: parsed.data.shippingAddress,
+        shippingCity: parsed.data.shippingCity, shippingState: parsed.data.shippingState,
+        shippingPhone: parsed.data.shippingPhone, couponCode: parsed.data.couponCode ?? null,
+      }).returning();
+      for (const item of orderItems) {
+        await tx.insert(orderItemsTable).values({
+          orderId: created.id, productId: item.productId, vendorId: item.vendorId,
+          quantity: item.quantity, selectedSize: item.selectedSize ?? null,
+          unitPrice: String(item.unitPrice), commissionRate: String(item.commissionRate),
+          commissionAmount: String(item.commissionAmount), vendorAmount: String(item.vendorAmount),
+        });
+      }
+      return created;
     });
+    res.status(201).json(await formatOrder(order));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to reserve inventory.";
+    res.status(409).json({ error: message });
   }
-
-  const discountAmount = 0; // Applied by coupon validation before order creation
-  const [order] = await db.insert(ordersTable).values({
-    userId: req.user!.userId,
-    status: "pending",
-    totalAmount: String(totalAmount),
-    discountAmount: String(discountAmount),
-    currency: "NGN",
-    shippingAddress: parsed.data.shippingAddress,
-    shippingCity: parsed.data.shippingCity,
-    shippingState: parsed.data.shippingState,
-    shippingPhone: parsed.data.shippingPhone,
-    couponCode: parsed.data.couponCode ?? null,
-  }).returning();
-
-  for (const item of orderItems) {
-    await db.insert(orderItemsTable).values({
-      orderId: order.id,
-      productId: item.productId,
-      vendorId: item.vendorId,
-      quantity: item.quantity,
-      selectedSize: item.selectedSize ?? null,
-      unitPrice: String(item.unitPrice),
-      commissionRate: String(item.commissionRate),
-      commissionAmount: String(item.commissionAmount),
-      vendorAmount: String(item.vendorAmount),
-    });
-  }
-
-  res.status(201).json(await formatOrder(order));
 });
 
 // GET /orders/:id

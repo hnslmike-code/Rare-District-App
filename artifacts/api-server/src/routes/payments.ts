@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, transactionsTable, vendorsTable } from "@workspace/db";
 import { InitiatePaystackPaymentBody, InitiateFlutterwavePaymentBody, VerifyPaystackPaymentBody, VerifyFlutterwavePaymentBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
@@ -8,6 +8,40 @@ const router: IRouter = Router();
 
 const PAYSTACK_SECRET = process.env.PAYSTACK_SECRET_KEY ?? "";
 const FLUTTERWAVE_SECRET = process.env.FLUTTERWAVE_SECRET_KEY ?? "";
+
+async function settlePaidOrder(order: typeof ordersTable.$inferSelect, processor: string, reference: string) {
+  return db.transaction(async (tx) => {
+    // Serialize settlement per order so a repeated callback cannot double-credit.
+    await tx.execute(sql`SELECT id FROM orders WHERE id = ${order.id} FOR UPDATE`);
+    const [existing] = await tx.select().from(transactionsTable).where(and(
+      eq(transactionsTable.orderId, order.id),
+      eq(transactionsTable.reference, reference),
+      eq(transactionsTable.status, "success"),
+    )).limit(1);
+    if (existing) return false;
+
+    await tx.update(ordersTable).set({ status: "paid" }).where(eq(ordersTable.id, order.id));
+    const items = await tx.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+    for (const item of items) {
+      await tx.insert(transactionsTable).values({
+        orderId: order.id,
+        buyerId: order.userId,
+        vendorId: item.vendorId,
+        amount: String(parseFloat(item.unitPrice) * item.quantity),
+        commissionRate: item.commissionRate,
+        commissionAmount: item.commissionAmount,
+        vendorAmount: item.vendorAmount,
+        processor,
+        reference,
+        status: "success",
+      });
+      await tx.update(vendorsTable)
+        .set({ payoutBalance: sql`${vendorsTable.payoutBalance} + ${parseFloat(item.vendorAmount)}` })
+        .where(eq(vendorsTable.id, item.vendorId));
+    }
+    return true;
+  });
+}
 
 // POST /payments/paystack/initiate
 router.post("/payments/paystack/initiate", requireAuth, async (req, res): Promise<void> => {
@@ -119,27 +153,7 @@ router.post("/payments/paystack/verify", requireAuth, async (req, res): Promise<
     const data = await response.json() as { status: boolean; data?: { status: string; amount: number; reference: string } };
 
     if (data.status && data.data?.status === "success") {
-      await db.update(ordersTable).set({ status: "paid" }).where(eq(ordersTable.id, order.id));
-      // Create transaction records for each vendor
-      const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
-      for (const item of items) {
-        await db.insert(transactionsTable).values({
-          orderId: order.id,
-          buyerId: order.userId,
-          vendorId: item.vendorId,
-          amount: String(parseFloat(item.unitPrice) * item.quantity),
-          commissionRate: item.commissionRate,
-          commissionAmount: item.commissionAmount,
-          vendorAmount: item.vendorAmount,
-          processor: "paystack",
-          reference: parsed.data.reference,
-          status: "success",
-        });
-        // Credit vendor balance
-        await db.execute(
-          `UPDATE vendors SET payout_balance = payout_balance + ${parseFloat(item.vendorAmount)} WHERE id = ${item.vendorId}`
-        );
-      }
+      await settlePaidOrder(order, "paystack", parsed.data.reference);
       res.json({ success: true, status: "paid", orderId: order.id, amount: parseFloat(order.totalAmount), reference: parsed.data.reference });
     } else {
       res.json({ success: false, status: "failed", orderId: order.id, amount: 0, reference: parsed.data.reference });
@@ -147,7 +161,7 @@ router.post("/payments/paystack/verify", requireAuth, async (req, res): Promise<
   } catch (err) {
     req.log.error({ err }, "Paystack verify error — simulating success for placeholder key");
     // Simulate success for placeholder keys in dev
-    await db.update(ordersTable).set({ status: "paid" }).where(eq(ordersTable.id, order.id));
+    await settlePaidOrder(order, "paystack", parsed.data.reference);
     res.json({ success: true, status: "paid", orderId: order.id, amount: parseFloat(order.totalAmount), reference: parsed.data.reference });
   }
 });
@@ -173,14 +187,14 @@ router.post("/payments/flutterwave/verify", requireAuth, async (req, res): Promi
     const data = await response.json() as { status: string; data?: { status: string; amount: number } };
 
     if (data.status === "success" && data.data?.status === "successful") {
-      await db.update(ordersTable).set({ status: "paid" }).where(eq(ordersTable.id, order.id));
+      await settlePaidOrder(order, "flutterwave", parsed.data.reference);
       res.json({ success: true, status: "paid", orderId: order.id, amount: parseFloat(order.totalAmount), reference: parsed.data.reference });
     } else {
       res.json({ success: false, status: "failed", orderId: order.id, amount: 0, reference: parsed.data.reference });
     }
   } catch (err) {
     req.log.error({ err }, "Flutterwave verify error — simulating success for placeholder key");
-    await db.update(ordersTable).set({ status: "paid" }).where(eq(ordersTable.id, order.id));
+    await settlePaidOrder(order, "flutterwave", parsed.data.reference);
     res.json({ success: true, status: "paid", orderId: order.id, amount: parseFloat(order.totalAmount), reference: parsed.data.reference });
   }
 });
