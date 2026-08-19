@@ -38,7 +38,17 @@ async function buildProductResponse(p: typeof productsTable.$inferSelect, vendor
 // GET /products
 router.get("/products", optionalAuth, async (req, res): Promise<void> => {
   const parsed = ListProductsQueryParams.safeParse(req.query);
-  const q = parsed.success ? parsed.data : {};
+  const q: {
+    category?: string;
+    vendorId?: number;
+    minPrice?: number;
+    maxPrice?: number;
+    search?: string;
+    size?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: "newest" | "price_asc" | "price_desc" | "popular";
+  } = parsed.success ? parsed.data : {};
 
   let conditions = [eq(productsTable.isActive, true)];
   if (q.category) conditions.push(eq(productsTable.category, q.category));

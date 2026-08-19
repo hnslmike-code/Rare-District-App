@@ -1,8 +1,36 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { db, productsTable, vendorsTable, usersTable, categoriesTable } from "@workspace/db";
+import { db, productsTable, vendorsTable, usersTable, categoriesTable, homepageConfigsTable, type HomepageContent } from "@workspace/db";
 
 const router: IRouter = Router();
+
+const storefrontHomepageFallback: HomepageContent = {
+  hero: {
+    eyebrow: "Drop 01 / now live",
+    title: "Wear the",
+    accent: "next wave.",
+    description: "The new names, rare pieces, and future-facing African fashion worth finding before everyone else does.",
+    primaryLabel: "Shop new drop",
+    primaryHref: "/shop?category=new",
+    secondaryLabel: "Meet the designers",
+    secondaryHref: "/shop?category=designers",
+    release: "01",
+    visualLabel: "Rare District\nFuture archive",
+    location: "Lagos / Worldwide",
+    proof: ["Independent labels", "Private releases", "Lagos to global"],
+    productIds: [],
+  },
+  carousel: { eyebrow: "The district edit / 01", title: "Pieces with presence.", productIds: [], autoplay: true },
+  sections: { latest: true, editorial: true, designers: true },
+};
+
+// GET /storefront/homepage
+router.get("/storefront/homepage", async (_req, res): Promise<void> => {
+  const [config] = await db.select().from(homepageConfigsTable).orderBy(desc(homepageConfigsTable.id)).limit(1);
+  const scheduledIsLive = Boolean(config?.scheduledContent && config.scheduledAt && config.scheduledAt <= new Date());
+  const content = (scheduledIsLive ? config?.scheduledContent : config?.publishedContent) ?? storefrontHomepageFallback;
+  res.json({ content, publishedAt: scheduledIsLive ? config?.scheduledAt : config?.publishedAt, source: scheduledIsLive ? "scheduled" : config?.publishedContent ? "published" : "fallback" });
+});
 
 // GET /storefront/summary
 router.get("/storefront/summary", async (_req, res): Promise<void> => {

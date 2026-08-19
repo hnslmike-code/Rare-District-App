@@ -69,6 +69,10 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
+  if (user.isSuspended) {
+    res.status(403).json({ error: "This account is currently suspended. Contact Rare District support for help." });
+    return;
+  }
   const valid = await comparePassword(password, user.passwordHash);
   if (!valid) {
     res.status(401).json({ error: "Invalid credentials" });

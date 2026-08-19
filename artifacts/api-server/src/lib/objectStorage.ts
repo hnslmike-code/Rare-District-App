@@ -267,6 +267,9 @@ async function signObjectURL({
     );
   }
 
-  const { signed_url: signedURL } = await response.json();
+  const { signed_url: signedURL } = await response.json() as { signed_url?: string };
+  if (!signedURL) {
+    throw new Error("Storage provider returned no signed URL.");
+  }
   return signedURL;
 }

@@ -1,4 +1,6 @@
 import { type Request, type Response, type NextFunction } from "express";
+import { eq } from "drizzle-orm";
+import { db, usersTable } from "@workspace/db";
 import { verifyToken, type JwtPayload } from "../lib/auth";
 
 declare global {
@@ -9,7 +11,7 @@ declare global {
   }
 }
 
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     res.status(401).json({ error: "Authentication required" });
@@ -17,7 +19,17 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   }
   const token = authHeader.slice(7);
   try {
-    req.user = verifyToken(token);
+    const tokenUser = verifyToken(token);
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, tokenUser.userId));
+    if (!user) {
+      res.status(401).json({ error: "Account no longer exists" });
+      return;
+    }
+    if (user.isSuspended) {
+      res.status(403).json({ error: "This account is currently suspended. Contact Rare District support for help." });
+      return;
+    }
+    req.user = { ...tokenUser, role: user.role };
     next();
   } catch {
     res.status(401).json({ error: "Invalid or expired token" });
@@ -38,11 +50,13 @@ export function requireRole(...roles: string[]) {
   };
 }
 
-export function optionalAuth(req: Request, _res: Response, next: NextFunction): void {
+export async function optionalAuth(req: Request, _res: Response, next: NextFunction): Promise<void> {
   const authHeader = req.headers.authorization;
   if (authHeader?.startsWith("Bearer ")) {
     try {
-      req.user = verifyToken(authHeader.slice(7));
+      const tokenUser = verifyToken(authHeader.slice(7));
+      const [user] = await db.select().from(usersTable).where(eq(usersTable.id, tokenUser.userId));
+      if (user && !user.isSuspended) req.user = { ...tokenUser, role: user.role };
     } catch {
       // ignore invalid token — user is just unauthenticated
     }

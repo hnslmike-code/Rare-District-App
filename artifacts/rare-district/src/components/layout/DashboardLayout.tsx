@@ -11,6 +11,8 @@ import {
   Store,
   CreditCard,
   Tag,
+  Image,
+  Activity,
   Menu,
   X,
 } from "lucide-react";
@@ -39,6 +41,8 @@ export function DashboardLayout({
 
   const adminLinks = [
     { href: "/admin", label: "Platform Overview", icon: LayoutDashboard },
+    { href: "/admin/merchandising", label: "Merchandising", icon: Image },
+    { href: "/admin/operations", label: "Operations", icon: Activity },
     { href: "/admin/vendors", label: "Vendors", icon: Store },
     { href: "/admin/products", label: "Products", icon: Package },
     { href: "/admin/orders", label: "All Orders", icon: ShoppingCart },

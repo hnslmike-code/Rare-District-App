@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Link } from "wouter";
 import { useAddToWardrobe, useGetStorefrontSummary, useListProducts } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, Pause, Play, ShoppingBag, X } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCard } from "@/components/ProductCard";
@@ -23,6 +24,16 @@ type Product = {
 type CarouselEntry =
   | { kind: "product"; product: Product }
   | { kind: "collection"; product: Product; title: string; category: string };
+
+type HomepageContent = {
+  hero: {
+    eyebrow: string; title: string; accent: string; description: string;
+    primaryLabel: string; primaryHref: string; secondaryLabel: string; secondaryHref: string;
+    release: string; visualLabel: string; location: string; proof: string[]; productIds: number[];
+  };
+  carousel: { eyebrow: string; title: string; productIds: number[]; autoplay: boolean };
+  sections: { latest: boolean; editorial: boolean; designers: boolean };
+};
 
 function imageUrl(product?: Product) {
   const image = product?.images?.[0];
@@ -106,7 +117,7 @@ function QuickAddDrawer({ product, onClose }: { product: Product | null; onClose
   );
 }
 
-function LayeredCarousel({ entries, onQuickAdd }: { entries: CarouselEntry[]; onQuickAdd: (product: Product) => void }) {
+function LayeredCarousel({ entries, onQuickAdd, autoplay = true }: { entries: CarouselEntry[]; onQuickAdd: (product: Product) => void; autoplay?: boolean }) {
   const [active, setActive] = useState(0);
   const [paused, setPaused] = useState(false);
   const [dragStart, setDragStart] = useState<number | null>(null);
@@ -117,10 +128,10 @@ function LayeredCarousel({ entries, onQuickAdd }: { entries: CarouselEntry[]; on
   const safeIndex = count ? active % count : 0;
 
   useEffect(() => {
-    if (paused || prefersReducedMotion || count < 2) return;
+    if (paused || !autoplay || prefersReducedMotion || count < 2) return;
     const timer = window.setInterval(() => setActive((current) => current + 1), 5200);
     return () => window.clearInterval(timer);
-  }, [paused, prefersReducedMotion, count]);
+  }, [paused, autoplay, prefersReducedMotion, count]);
 
   const go = (delta: number) => setActive((current) => (current + delta + count) % count);
   const getEntry = (offset: number) => entries[(safeIndex + offset + count) % count];
@@ -182,13 +193,26 @@ function LayeredCarousel({ entries, onQuickAdd }: { entries: CarouselEntry[]; on
 
 export default function Home() {
   const { data: summary, isLoading } = useGetStorefrontSummary();
-  const newest = useListProducts({ sortBy: "newest", limit: 8 }, { query: { queryKey: ["home-products", "newest"] } });
+  const newest = useListProducts({ sortBy: "newest", limit: 100 }, { query: { queryKey: ["home-products", "newest"] } });
   const popular = useListProducts({ sortBy: "popular", limit: 4 }, { query: { queryKey: ["home-products", "popular"] } });
+  const homepage = useQuery<{ content: HomepageContent }>({
+    queryKey: ["storefront-homepage"],
+    queryFn: async () => {
+      const response = await fetch("/api/storefront/homepage");
+      if (!response.ok) throw new Error("Homepage configuration is unavailable.");
+      return response.json();
+    },
+    staleTime: 30_000,
+  });
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
   const products = (newest.data?.items || []) as Product[];
-  const heroProducts = products.slice(0, 2);
+  const content = homepage.data?.content;
+  const productsById = useMemo(() => new Map(products.map(product => [product.id, product])), [products]);
+  const configuredHeroProducts = content?.hero.productIds.map(id => productsById.get(id)).filter((product): product is Product => Boolean(product)) ?? [];
+  const heroProducts = configuredHeroProducts.length ? configuredHeroProducts : products.slice(0, 2);
   const edit = useMemo<CarouselEntry[]>(() => {
-    const source = products.slice(0, 6);
+    const configured = content?.carousel.productIds.map(id => productsById.get(id)).filter((product): product is Product => Boolean(product)) ?? [];
+    const source = configured.length ? configured : products.slice(0, 6);
     return source.flatMap((product, index) => {
       const entries: CarouselEntry[] = [{ kind: "product", product }];
       if (index === 1 || index === 3) {
@@ -197,7 +221,7 @@ export default function Home() {
       }
       return entries;
     });
-  }, [products]);
+  }, [content?.carousel.productIds, products, productsById]);
   const featured = (summary?.featuredProducts || []) as Product[];
 
   if (isLoading) return <div className="container mx-auto space-y-12 px-4 py-16"><Skeleton className="h-[70vh] w-full" /><Skeleton className="h-64 w-full" /></div>;
@@ -206,18 +230,18 @@ export default function Home() {
     <div className="home-page">
       <section className="rd-hero">
         <div className="rd-hero-copy">
-          <p className="rd-hero-kicker"><span aria-hidden="true" /> Drop 01 / now live</p>
-          <h1>Wear the<br /><em>next wave.</em></h1>
-          <p className="rd-hero-description">The new names, rare pieces, and future-facing African fashion worth finding before everyone else does.</p>
+          <p className="rd-hero-kicker"><span aria-hidden="true" /> {content?.hero.eyebrow ?? "Drop 01 / now live"}</p>
+          <h1>{content?.hero.title ?? "Wear the"}<br /><em>{content?.hero.accent ?? "next wave."}</em></h1>
+          <p className="rd-hero-description">{content?.hero.description ?? "The new names, rare pieces, and future-facing African fashion worth finding before everyone else does."}</p>
           <div className="rd-hero-actions">
-            <Link href="/shop?category=new" className="rd-primary-button" data-testid="link-enter-district">Shop new drop <ArrowRight className="h-4 w-4" /></Link>
-            <Link href="/shop?category=designers" className="rd-hero-secondary">Meet the designers <ArrowRight className="h-4 w-4" /></Link>
+            <Link href={content?.hero.primaryHref ?? "/shop?category=new"} className="rd-primary-button" data-testid="link-enter-district">{content?.hero.primaryLabel ?? "Shop new drop"} <ArrowRight className="h-4 w-4" /></Link>
+            <Link href={content?.hero.secondaryHref ?? "/shop?category=designers"} className="rd-hero-secondary">{content?.hero.secondaryLabel ?? "Meet the designers"} <ArrowRight className="h-4 w-4" /></Link>
           </div>
-          <p className="rd-hero-proof">Independent labels <span>·</span> Private releases <span>·</span> Lagos to global</p>
+          <p className="rd-hero-proof">{(content?.hero.proof ?? ["Independent labels", "Private releases", "Lagos to global"]).map((item, index) => <span key={item} className="contents">{index > 0 ? <i>·</i> : null}{item}</span>)}</p>
         </div>
         <div className="rd-hero-visual" aria-label="New arrivals preview">
-          <p className="rd-hero-visual-label">Rare District<br />Future archive</p>
-          <span className="rd-hero-release">01</span>
+          <p className="rd-hero-visual-label">{(content?.hero.visualLabel ?? "Rare District\nFuture archive").split("\n").map((line) => <span key={line} className="block">{line}</span>)}</p>
+          <span className="rd-hero-release">{content?.hero.release ?? "01"}</span>
           {heroProducts[0] ? (
             <Link href={`/product/${heroProducts[0].id}`} className="rd-hero-product rd-hero-product-main">
               {imageUrl(heroProducts[0]) ? <img src={imageUrl(heroProducts[0])} alt={heroProducts[0].name} /> : <ProductPlaceholder product={heroProducts[0]} />}
@@ -230,28 +254,28 @@ export default function Home() {
               <span>{heroProducts[1].name}</span>
             </Link>
           ) : null}
-          <p className="rd-hero-location">Lagos <span>/</span> Worldwide</p>
+          <p className="rd-hero-location">{(content?.hero.location ?? "Lagos / Worldwide").split("/").map((item, index) => <span key={`${item}-${index}`}>{index > 0 ? <i>/</i> : null}{item.trim()}</span>)}</p>
         </div>
       </section>
 
       <section className="carousel-section" data-testid="section-featured-carousel">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="section-heading"><div><p className="eyebrow">The district edit / 01</p><h2>Pieces with presence.</h2></div><Link href="/shop" className="text-xs font-bold uppercase tracking-[0.2em] hover:underline">Shop all <ArrowRight className="ml-2 inline h-3.5 w-3.5" /></Link></div>
-          <LayeredCarousel entries={edit} onQuickAdd={setQuickAdd} />
+          <div className="section-heading"><div><p className="eyebrow">{content?.carousel.eyebrow ?? "The district edit / 01"}</p><h2>{content?.carousel.title ?? "Pieces with presence."}</h2></div><Link href="/shop" className="text-xs font-bold uppercase tracking-[0.2em] hover:underline">Shop all <ArrowRight className="ml-2 inline h-3.5 w-3.5" /></Link></div>
+          <LayeredCarousel entries={edit} onQuickAdd={setQuickAdd} autoplay={content?.carousel.autoplay ?? true} />
         </div>
       </section>
 
-      <section className="container mx-auto px-4 py-20 md:px-6 md:py-28">
+      {(content?.sections.latest ?? true) && <section className="container mx-auto px-4 py-20 md:px-6 md:py-28">
         <div className="section-heading"><div><p className="eyebrow">The latest arrivals</p><h2>New in the district.</h2></div><Link href="/shop?category=new" className="text-xs font-bold uppercase tracking-[0.2em] hover:underline">Explore new <ArrowRight className="ml-2 inline h-3.5 w-3.5" /></Link></div>
         {newest.isLoading ? <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="aspect-[3/4]" />)}</div> : <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">{products.slice(0, 4).map((product) => <ProductCard key={product.id} product={product} showWardrobe={false} dataTestId={`home-product-${product.id}`} />)}</div>}
-      </section>
+      </section>}
 
-      <section className="editorial-band"><div className="container mx-auto grid items-center gap-10 px-4 py-20 md:px-6 md:py-28 lg:grid-cols-[1.1fr_.9fr]"><div><p className="eyebrow">The house edit</p><h2>Find the brand<br /><em>before the trend.</em></h2></div><div><p className="max-w-md text-lg leading-relaxed text-muted-foreground">Rare District brings the ateliers, cult labels, and emerging voices of contemporary African fashion into one considered marketplace.</p><Link href="/shop?category=designers" className="mt-8 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] hover:underline">Meet the designers <ArrowRight className="h-4 w-4" /></Link></div></div></section>
+      {(content?.sections.editorial ?? true) && <section className="editorial-band"><div className="container mx-auto grid items-center gap-10 px-4 py-20 md:px-6 md:py-28 lg:grid-cols-[1.1fr_.9fr]"><div><p className="eyebrow">The house edit</p><h2>Find the brand<br /><em>before the trend.</em></h2></div><div><p className="max-w-md text-lg leading-relaxed text-muted-foreground">Rare District brings the ateliers, cult labels, and emerging voices of contemporary African fashion into one considered marketplace.</p><Link href="/shop?category=designers" className="mt-8 inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] hover:underline">Meet the designers <ArrowRight className="h-4 w-4" /></Link></div></div></section>}
 
-      <section className="container mx-auto px-4 py-20 md:px-6 md:py-28">
+      {(content?.sections.designers ?? true) && <section className="container mx-auto px-4 py-20 md:px-6 md:py-28">
         <div className="section-heading"><div><p className="eyebrow">The ateliers</p><h2>Start with a name.</h2></div><Link href="/shop?category=designers" className="text-xs font-bold uppercase tracking-[0.2em] hover:underline">View all <ArrowRight className="ml-2 inline h-3.5 w-3.5" /></Link></div>
         <div className="grid gap-5 md:grid-cols-3">{summary?.featuredVendors?.slice(0, 3).map((vendor) => <Link key={vendor.id} href={`/vendor/${vendor.id}`} className="vendor-tile"><div className="vendor-tile-mark">{vendor.logoUrl ? <img src={vendor.logoUrl} alt="" /> : vendor.brandName.charAt(0)}</div><div><p className="eyebrow">{vendor.description || "Independent atelier"}</p><h3>{vendor.brandName}</h3></div><ArrowRight className="h-4 w-4" /></Link>)}</div>
-      </section>
+      </section>}
       <QuickAddDrawer product={quickAdd} onClose={() => setQuickAdd(null)} />
     </div>
   );
