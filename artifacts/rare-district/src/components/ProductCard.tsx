@@ -86,7 +86,7 @@ export function ProductCard({ product, dataTestId, showWardrobe = true }: Produc
   };
 
   const imageUrl = product.images && product.images.length > 0
-    ? product.images[0].startsWith("http") || product.images[0].startsWith("/")
+    ? product.images[0].startsWith("http") || product.images[0].startsWith("/") || product.images[0].startsWith("data:")
       ? product.images[0]
       : `/api/storage/objects/${product.images[0]}`
     : undefined;
