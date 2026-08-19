@@ -137,7 +137,7 @@ function LayeredCarousel({ entries, onQuickAdd }: { entries: CarouselEntry[]; on
                 <div className="layered-slide-image">
                   {imageUrl(product) ? <img src={imageUrl(product)} alt={entry.kind === "collection" ? entry.title : product.name} draggable={false} /> : <ProductPlaceholder product={product} collection={entry.kind === "collection"} />}
                 </div>
-                {isActive && <div className="layered-slide-copy"><p className="eyebrow">{product.vendor?.brandName || "Rare District edit"}</p><h3>{entry.kind === "collection" ? entry.title : product.name}</h3><p className="layered-slide-price">{entry.kind === "collection" ? "Browse the edit" : money(product)}</p></div>}
+                {isActive && <div className="layered-slide-copy"><p className="eyebrow">{product.vendor?.brandName || "Rare District edit"}</p><h3>{entry.kind === "collection" ? entry.title : product.name}</h3><p className="layered-slide-price">{entry.kind === "collection" ? "Browse the edit" : money(product)}</p>{entry.kind === "product" && product.stock ? <p className="layered-stock"><span aria-hidden="true" /> Only {product.stock} left</p> : null}</div>}
               </Link>
               {isActive && entry.kind === "product" && <button onClick={() => onQuickAdd(product)} className="layered-quick-add"><ShoppingBag className="h-4 w-4" /> Quick add</button>}
             </article>
