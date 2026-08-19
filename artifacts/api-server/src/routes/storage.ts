@@ -10,6 +10,7 @@ import {
   ObjectNotFoundError,
   ObjectStorageService,
 } from '../lib/objectStorage';
+import { requireAuth } from "../middlewares/auth";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -34,6 +35,7 @@ function hasAuthenticatedSession(req: Request): boolean {
  */
 router.post(
   '/storage/uploads/request-url',
+  requireAuth,
   async (req: Request, res: Response) => {
     if (!hasAuthenticatedSession(req)) {
       res.status(401).json({ error: 'Unauthorized' });

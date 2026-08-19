@@ -90,7 +90,8 @@ async function recordAudit(req: Parameters<typeof router.get>[1] extends (req: i
 
 function formatVendor(v: typeof vendorsTable.$inferSelect, user?: typeof usersTable.$inferSelect) {
   return {
-    id: v.id, userId: v.userId, brandName: v.brandName, description: v.description,
+    id: v.id, userId: v.userId, brandName: v.brandName, contactName: v.contactName, phone: v.phone, description: v.description,
+    category: v.category, experienceLevel: v.experienceLevel, socialLink: v.socialLink, sampleImages: v.sampleImages,
     logoUrl: v.logoUrl, website: v.website, bankName: v.bankName,
     accountNumber: v.accountNumber, accountName: v.accountName, status: v.status,
     commissionRateOverride: v.commissionRateOverride ? parseFloat(v.commissionRateOverride) : null,

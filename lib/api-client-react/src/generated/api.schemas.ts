@@ -87,7 +87,18 @@ export interface Vendor {
   userId: number;
   brandName: string;
   /** @nullable */
+  contactName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
   description?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  experienceLevel?: string | null;
+  /** @nullable */
+  socialLink?: string | null;
+  sampleImages?: string[];
   /** @nullable */
   logoUrl?: string | null;
   /** @nullable */
@@ -112,17 +123,17 @@ export interface VendorApplication {
   /** @minLength 2 */
   brandName: string;
   /** @minLength 2 */
-  contactName?: string;
-  phone?: string;
-  category?: string;
-  experienceLevel?: string;
-  socialLink?: string;
+  contactName: string;
+  phone: string;
+  category: string;
+  experienceLevel: string;
+  socialLink: string;
   /**
      * @minItems 3
      * @maxItems 5
      */
-  sampleImages?: string[];
-  description?: string;
+  sampleImages: string[];
+  description: string;
   logoUrl?: string;
   website?: string;
   bankName?: string;

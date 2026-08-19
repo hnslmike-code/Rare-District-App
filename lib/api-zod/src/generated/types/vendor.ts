@@ -13,7 +13,18 @@ export interface Vendor {
   userId: number;
   brandName: string;
   /** @nullable */
+  contactName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
   description?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  experienceLevel?: string | null;
+  /** @nullable */
+  socialLink?: string | null;
+  sampleImages?: string[];
   /** @nullable */
   logoUrl?: string | null;
   /** @nullable */

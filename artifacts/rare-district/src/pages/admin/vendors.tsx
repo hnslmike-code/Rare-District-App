@@ -71,12 +71,16 @@ export default function AdminVendors() {
                 <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center font-serif text-lg font-bold text-muted-foreground flex-shrink-0">
                   {vendor.brandName.charAt(0)}
                 </div>
-                <div className="min-w-0">
+                  <div className="min-w-0">
                   <p className="font-bold text-base">{vendor.brandName}</p>
-                  <p className="text-sm text-muted-foreground truncate">{vendor.user?.email}</p>
+                    <p className="text-sm text-muted-foreground truncate">{vendor.contactName || "Applicant"} {vendor.phone ? `· ${vendor.phone}` : ""}</p>
+                    <p className="text-xs text-muted-foreground truncate">{vendor.user?.email}</p>
+                    {vendor.category || vendor.experienceLevel ? <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-primary">{[vendor.category, vendor.experienceLevel].filter(Boolean).join(" · ")}</p> : null}
                   {vendor.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{vendor.description}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{vendor.description}</p>
                   )}
+                    {vendor.socialLink ? <a className="mt-2 block text-xs underline underline-offset-4" href={vendor.socialLink} target="_blank" rel="noreferrer">Open portfolio / social</a> : null}
+                    {vendor.sampleImages?.length ? <div className="mt-3 flex gap-2 overflow-x-auto">{vendor.sampleImages.map((image, index) => <a key={`${vendor.id}-${index}`} href={`/api/storage${image}`} target="_blank" rel="noreferrer" className="h-12 w-12 shrink-0 overflow-hidden border border-border"><img src={`/api/storage${image}`} alt={`${vendor.brandName} sample ${index + 1}`} className="h-full w-full object-cover" /></a>)}</div> : null}
                 </div>
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">

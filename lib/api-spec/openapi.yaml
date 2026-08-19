@@ -1369,8 +1369,22 @@ components:
           type: integer
         brandName:
           type: string
+        contactName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
         description:
           type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        experienceLevel:
+          type: ["string", "null"]
+        socialLink:
+          type: ["string", "null"]
+        sampleImages:
+          type: array
+          items:
+            type: string
         logoUrl:
           type: ["string", "null"]
         website:
@@ -1398,7 +1412,7 @@ components:
 
     VendorApplication:
       type: object
-      required: [brandName]
+      required: [brandName, contactName, phone, category, description, experienceLevel, socialLink, sampleImages]
       properties:
         brandName:
           type: string

@@ -1,0 +1,1 @@
+- [API Zod code generation](api-zod-codegen.md) — generated Zod 4 schemas need the workspace’s `zod/v4` import path after regeneration.
