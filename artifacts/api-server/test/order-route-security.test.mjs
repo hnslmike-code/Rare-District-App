@@ -48,7 +48,7 @@ if (!databaseUrl) {
 } else {
   test("order routes isolate mixed-vendor data and enforce ownership boundaries", async () => {
     const pool = new Pool({ connectionString: databaseUrl });
-    const created = { users: [], vendors: [], products: [], orders: [], orderItems: [] };
+    const created = { users: [], vendors: [], products: [], orders: [], orderItems: [], transactions: [], payouts: [] };
     const serverOutput = [];
     const server = spawn(process.execPath, ["--enable-source-maps", "./dist/index.mjs"], {
       cwd: resolve(import.meta.dirname, ".."),
@@ -167,6 +167,20 @@ if (!databaseUrl) {
       const cancellableOrderId = await createOrder(buyer.id, "paid", [
         { productId: productA.id, vendorId: vendorA.id, unitPrice: 1000 },
       ]);
+      await query("UPDATE vendors SET admin_note = $1 WHERE id = $2", ["Retain this note", vendorA.id]);
+      const transactionResult = await query(
+        `INSERT INTO transactions (
+          order_id, buyer_id, vendor_id, amount, commission_rate, commission_amount, vendor_amount, processor, status
+        ) VALUES ($1, $2, $3, 1000, 5, 50, 950, 'paystack', 'success') RETURNING id`,
+        [mixedOrderId, buyer.id, vendorA.id],
+      );
+      created.transactions.push(transactionResult.rows[0].id);
+      const payoutResult = await query(
+        `INSERT INTO payout_records (vendor_id, amount, note, status, reference)
+         VALUES ($1, 500, 'Settlement', 'paid', 'payout-secret-reference') RETURNING id`,
+        [vendorA.id],
+      );
+      created.payouts.push(payoutResult.rows[0].id);
 
       const recentOrdersResponse = await fetch(`${apiUrl}/vendors/dashboard/recent-orders`, {
         headers: auth(vendorAUser),
@@ -176,6 +190,45 @@ if (!databaseUrl) {
       const vendorMixedOrder = recentOrders.find(order => order.id === mixedOrderId);
       assert.deepEqual(vendorMixedOrder.items.map(item => item.vendorId), [vendorA.id]);
       assert.deepEqual(vendorMixedOrder.items.map(item => item.productId), [productA.id]);
+
+      const preserveNoteResponse = await fetch(`${apiUrl}/admin/vendors/${vendorA.id}/status`, {
+        method: "PATCH",
+        headers: auth(adminUser),
+        body: JSON.stringify({ status: "approved" }),
+      });
+      assert.equal(preserveNoteResponse.status, 200);
+      assert.equal((await preserveNoteResponse.json()).adminNote, "Retain this note");
+
+      const vendorDetailResponse = await fetch(`${apiUrl}/admin/vendors/${vendorA.id}`, {
+        headers: auth(adminUser),
+      });
+      assert.equal(vendorDetailResponse.status, 200);
+      const vendorDetail = await vendorDetailResponse.json();
+      assert.equal(vendorDetail.vendor.id, vendorA.id);
+      assert.deepEqual(
+        vendorDetail.orderItems.filter(item => item.orderId === mixedOrderId).map(item => item.productId),
+        [productA.id],
+      );
+      assert.equal("accountNumber" in vendorDetail.vendor, false);
+      assert.equal("referralCode" in vendorDetail.vendor.user, false);
+      assert.equal("shippingAddress" in vendorDetail.orderItems[0], false);
+      assert.equal("shippingPhone" in vendorDetail.orderItems[0], false);
+      assert.equal("paymentReference" in vendorDetail.orderItems[0], false);
+      assert.equal("vendor" in vendorDetail.catalog[0], false);
+      assert.equal("accountNumber" in vendorDetail.catalog[0], false);
+      assert.equal("referralCode" in vendorDetail.catalog[0], false);
+      assert.equal(vendorDetail.balance.totalSales, 950);
+      assert.equal(vendorDetail.balance.totalCommission, 50);
+      assert.equal(vendorDetail.balance.totalPaid, 500);
+      assert.equal(vendorDetail.payouts[0].reference, "••••ence");
+      assert.ok(vendorDetail.notes.some(note => note.text === "Retain this note"));
+      assert.ok(vendorDetail.decisions.some(decision => decision.status === "approved"));
+      assert.ok(vendorDetail.auditEvents.some(event => event.action === "vendor_approved"));
+
+      const nonAdminVendorDetailResponse = await fetch(`${apiUrl}/admin/vendors/${vendorA.id}`, {
+        headers: auth(vendorAUser),
+      });
+      assert.equal(nonAdminVendorDetailResponse.status, 403);
 
       const mixedUpdateResponse = await fetch(`${apiUrl}/orders/${mixedOrderId}/status`, {
         method: "PATCH",
@@ -245,6 +298,9 @@ if (!databaseUrl) {
       }
     } finally {
       try {
+        if (created.vendors.length) await query("DELETE FROM admin_audit_logs WHERE entity_type = 'vendor' AND entity_id = ANY($1::text[])", [created.vendors.map(String)]);
+        if (created.payouts.length) await query("DELETE FROM payout_records WHERE id = ANY($1::int[])", [created.payouts]);
+        if (created.transactions.length) await query("DELETE FROM transactions WHERE id = ANY($1::int[])", [created.transactions]);
         if (created.orderItems.length) await query("DELETE FROM order_items WHERE id = ANY($1::int[])", [created.orderItems]);
         if (created.orders.length) await query("DELETE FROM orders WHERE id = ANY($1::int[])", [created.orders]);
         if (created.products.length) await query("DELETE FROM products WHERE id = ANY($1::int[])", [created.products]);

@@ -1,10 +1,10 @@
 import { Router, type IRouter } from "express";
-import { and, eq, desc, sql, asc, gt, inArray } from "drizzle-orm";
-import { db, usersTable, vendorsTable, productsTable, ordersTable, transactionsTable, adminSettingsTable, payoutRecordsTable, homepageConfigsTable, vendorJoinPageConfigsTable, adminAuditLogsTable, categoriesTable, type HomepageContent, type VendorJoinPageContent } from "@workspace/db";
+import { and, eq, desc, sql, asc, gt, inArray, or } from "drizzle-orm";
+import { db, usersTable, vendorsTable, productsTable, ordersTable, orderItemsTable, transactionsTable, adminSettingsTable, payoutRecordsTable, homepageConfigsTable, vendorJoinPageConfigsTable, adminAuditLogsTable, categoriesTable, type HomepageContent, type VendorJoinPageContent } from "@workspace/db";
 import {
   UpdateVendorStatusParams, UpdateVendorStatusBody,
   ListAdminVendorsQueryParams, ListAdminProductsQueryParams, ListAdminOrdersQueryParams,
-  ListTransactionsQueryParams, MarkVendorPayoutParams, MarkVendorPayoutBody,
+  ListTransactionsQueryParams, MarkVendorPayoutParams, MarkVendorPayoutBody, GetAdminVendorDetailParams,
   UpdateAdminSettingsBody,
 } from "@workspace/api-zod";
 import { requireAuth, requireRole } from "../middlewares/auth";
@@ -159,12 +159,25 @@ function formatVendor(v: typeof vendorsTable.$inferSelect, user?: typeof usersTa
   return {
     id: v.id, userId: v.userId, brandName: v.brandName, contactName: v.contactName, phone: v.phone, description: v.description,
     category: v.category, experienceLevel: v.experienceLevel, socialLink: v.socialLink, sampleImages: v.sampleImages,
-    logoUrl: v.logoUrl, website: v.website, bankName: v.bankName,
-    accountNumber: v.accountNumber, accountName: v.accountName, status: v.status,
+    logoUrl: v.logoUrl, website: v.website, status: v.status,
     commissionRateOverride: v.commissionRateOverride ? parseFloat(v.commissionRateOverride) : null,
     payoutBalance: parseFloat(v.payoutBalance ?? "0"), adminNote: v.adminNote, createdAt: v.createdAt,
-    user: user ? { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl, role: user.role, referralCode: user.referralCode, referredBy: user.referredBy, createdAt: user.createdAt } : undefined,
+    user: user ? { id: user.id, email: user.email, name: user.name, isSuspended: user.isSuspended, createdAt: user.createdAt } : undefined,
   };
+}
+
+function maskLastFour(value: string | null) {
+  const lastFour = value?.replace(/\s/g, "").slice(-4);
+  return lastFour || null;
+}
+
+function maskReference(value: string | null) {
+  if (!value) return null;
+  return value.length <= 4 ? "••••" : `••••${value.slice(-4)}`;
+}
+
+function toAdminUser(user: { id: number | null; name: string | null; email: string | null }) {
+  return user.id && user.email ? { id: user.id, name: user.name, email: user.email } : undefined;
 }
 
 // GET /admin/stats
@@ -373,6 +386,153 @@ router.get("/admin/vendors", requireAuth, requireRole("admin"), async (req, res)
   res.json(result);
 });
 
+// GET /admin/vendors/:id
+// This is deliberately vendor-scoped: order rows are joined through order_items,
+// so a multi-vendor order can never reveal another vendor's fulfillment data.
+router.get("/admin/vendors/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const paramsParsed = GetAdminVendorDetailParams.safeParse({ id: raw });
+  if (!paramsParsed.success) {
+    res.status(400).json({ error: "Invalid vendor id." });
+    return;
+  }
+  const vendorId = paramsParsed.data.id;
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.id, vendorId));
+  if (!vendor) {
+    res.status(404).json({ error: "Vendor not found." });
+    return;
+  }
+
+  const [
+    [vendorUser],
+    catalog,
+    itemRows,
+    transactions,
+    payouts,
+  ] = await Promise.all([
+    db.select().from(usersTable).where(eq(usersTable.id, vendor.userId)).limit(1),
+    db.select().from(productsTable).where(eq(productsTable.vendorId, vendorId)).orderBy(desc(productsTable.createdAt)).limit(100),
+    db.select({
+      id: orderItemsTable.id,
+      orderId: orderItemsTable.orderId,
+      productId: orderItemsTable.productId,
+      productName: productsTable.name,
+      quantity: orderItemsTable.quantity,
+      selectedSize: orderItemsTable.selectedSize,
+      unitPrice: orderItemsTable.unitPrice,
+      commissionAmount: orderItemsTable.commissionAmount,
+      vendorAmount: orderItemsTable.vendorAmount,
+      fulfillmentStatus: orderItemsTable.fulfillmentStatus,
+      orderStatus: ordersTable.status,
+      orderedAt: ordersTable.createdAt,
+      customerId: usersTable.id,
+      customerName: usersTable.name,
+      customerEmail: usersTable.email,
+    }).from(orderItemsTable)
+      .innerJoin(ordersTable, eq(ordersTable.id, orderItemsTable.orderId))
+      .leftJoin(productsTable, eq(productsTable.id, orderItemsTable.productId))
+      .leftJoin(usersTable, eq(usersTable.id, ordersTable.userId))
+      .where(eq(orderItemsTable.vendorId, vendorId))
+      .orderBy(desc(ordersTable.createdAt))
+      .limit(100),
+    db.select().from(transactionsTable).where(eq(transactionsTable.vendorId, vendorId)).orderBy(desc(transactionsTable.createdAt)).limit(500),
+    db.select().from(payoutRecordsTable).where(eq(payoutRecordsTable.vendorId, vendorId)).orderBy(desc(payoutRecordsTable.createdAt)).limit(100),
+  ]);
+
+  const payoutIds = payouts.map(payout => String(payout.id));
+  const auditScope = payoutIds.length
+    ? or(
+      and(eq(adminAuditLogsTable.entityType, "vendor"), eq(adminAuditLogsTable.entityId, String(vendorId))),
+      and(eq(adminAuditLogsTable.entityType, "payout"), inArray(adminAuditLogsTable.entityId, payoutIds)),
+    )
+    : and(eq(adminAuditLogsTable.entityType, "vendor"), eq(adminAuditLogsTable.entityId, String(vendorId)));
+  const auditRows = await db.select({
+    id: adminAuditLogsTable.id,
+    action: adminAuditLogsTable.action,
+    entityType: adminAuditLogsTable.entityType,
+    entityId: adminAuditLogsTable.entityId,
+    detail: adminAuditLogsTable.detail,
+    createdAt: adminAuditLogsTable.createdAt,
+    adminId: usersTable.id,
+    adminName: usersTable.name,
+    adminEmail: usersTable.email,
+  }).from(adminAuditLogsTable)
+    .leftJoin(usersTable, eq(usersTable.id, adminAuditLogsTable.adminUserId))
+    .where(auditScope)
+    .orderBy(desc(adminAuditLogsTable.createdAt))
+    .limit(100);
+
+  const successfulTransactions = transactions.filter(transaction => transaction.status === "success");
+  const pendingPayouts = payouts
+    .filter(payout => payout.status === "pending" || payout.status === "approved")
+    .reduce((total, payout) => total + Number(payout.amount), 0);
+  const paidPayouts = payouts
+    .filter(payout => payout.status === "paid")
+    .reduce((total, payout) => total + Number(payout.amount), 0);
+  const auditEvents = auditRows.map(row => ({
+    id: row.id, action: row.action, entityType: row.entityType, entityId: row.entityId,
+    detail: row.detail, createdAt: row.createdAt,
+    admin: toAdminUser({ id: row.adminId, name: row.adminName, email: row.adminEmail }),
+  }));
+  const decisionEvents = auditEvents.filter(event => event.action === "vendor_approved" || event.action === "vendor_rejected");
+
+  res.json({
+    vendor: {
+      id: vendor.id, userId: vendor.userId, brandName: vendor.brandName, contactName: vendor.contactName, phone: vendor.phone,
+      description: vendor.description, category: vendor.category, experienceLevel: vendor.experienceLevel, socialLink: vendor.socialLink,
+      sampleImages: vendor.sampleImages, logoUrl: vendor.logoUrl, website: vendor.website, status: vendor.status,
+      commissionRateOverride: vendor.commissionRateOverride ? Number(vendor.commissionRateOverride) : null,
+      payoutBalance: Number(vendor.payoutBalance), adminNote: vendor.adminNote, createdAt: vendor.createdAt,
+      user: vendorUser ? { id: vendorUser.id, email: vendorUser.email, name: vendorUser.name, isSuspended: vendorUser.isSuspended, createdAt: vendorUser.createdAt } : undefined,
+      payoutAccount: {
+        bankName: vendor.bankName,
+        accountName: vendor.accountName,
+        accountNumberLast4: maskLastFour(vendor.accountNumber),
+      },
+    },
+    catalog: catalog.map(product => ({
+      id: product.id, vendorId: product.vendorId, name: product.name, description: product.description,
+      price: Number(product.price), currency: product.currency, category: product.category, sizes: product.sizes,
+      images: product.images, stock: product.stock, isActive: product.isActive, isFeatured: product.isFeatured,
+      wardrobeCount: product.wardrobeCount, averageRating: null, reviewCount: 0, createdAt: product.createdAt,
+    })),
+    orderItems: itemRows.map(item => ({
+      id: item.id, orderId: item.orderId, productId: item.productId, productName: item.productName ?? "Removed product",
+      quantity: item.quantity, selectedSize: item.selectedSize, unitPrice: Number(item.unitPrice),
+      commissionAmount: Number(item.commissionAmount), vendorAmount: Number(item.vendorAmount),
+      fulfillmentStatus: item.fulfillmentStatus, orderStatus: item.orderStatus, orderedAt: item.orderedAt,
+      customer: item.customerId && item.customerEmail
+        ? { id: item.customerId, name: item.customerName, email: item.customerEmail }
+        : undefined,
+    })),
+    balance: {
+      available: Number(vendor.payoutBalance),
+      pendingPayouts,
+      totalPaid: paidPayouts,
+      totalSales: successfulTransactions.reduce((total, transaction) => total + Number(transaction.vendorAmount), 0),
+      totalCommission: successfulTransactions.reduce((total, transaction) => total + Number(transaction.commissionAmount), 0),
+    },
+    payouts: payouts.map(payout => ({
+      id: payout.id, amount: Number(payout.amount), note: payout.note, status: payout.status,
+      reference: maskReference(payout.reference), reviewedAt: payout.reviewedAt, paidAt: payout.paidAt, createdAt: payout.createdAt,
+    })),
+    notes: [
+      ...(vendor.adminNote ? [{ id: 0, text: vendor.adminNote, createdAt: vendor.updatedAt, admin: undefined }] : []),
+      ...auditEvents.filter(event => event.action === "saved_vendor_note" && event.detail).map(event => ({
+        id: event.id, text: event.detail!, createdAt: event.createdAt, admin: event.admin,
+      })),
+    ],
+    suspensions: auditEvents.filter(event => event.action === "vendor_rejected").map(event => ({
+      id: event.id, reason: event.detail ?? "No reason recorded.", createdAt: event.createdAt, admin: event.admin,
+    })),
+    decisions: decisionEvents.map(event => ({
+      id: event.id, status: event.action === "vendor_approved" ? "approved" : "rejected",
+      note: event.detail, createdAt: event.createdAt, admin: event.admin,
+    })),
+    auditEvents,
+  });
+});
+
 // PATCH /admin/vendors/:id/status
 router.patch("/admin/vendors/:id/status", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
@@ -387,9 +547,15 @@ router.patch("/admin/vendors/:id/status", requireAuth, requireRole("admin"), asy
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const updates: { status: "approved" | "rejected"; adminNote?: string } = { status: parsed.data.status };
+  if (parsed.data.adminNote !== undefined) updates.adminNote = parsed.data.adminNote;
   const [vendor] = await db.update(vendorsTable)
-    .set({ status: parsed.data.status, adminNote: parsed.data.adminNote ?? null })
+    .set(updates)
     .where(eq(vendorsTable.id, paramsParsed.data.id)).returning();
+  if (!vendor) {
+    res.status(404).json({ error: "Vendor not found." });
+    return;
+  }
 
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, vendor.userId));
   await recordAudit(req, `vendor_${parsed.data.status}`, "vendor", String(vendor.id), parsed.data.adminNote ?? undefined);
@@ -415,7 +581,7 @@ router.patch("/admin/vendors/:id", requireAuth, requireRole("admin"), async (req
     return;
   }
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, vendor.userId));
-  await recordAudit(req, "updated_vendor_terms", "vendor", String(vendor.id));
+  await recordAudit(req, body.adminNote === undefined ? "updated_vendor_terms" : "saved_vendor_note", "vendor", String(vendor.id), typeof body.adminNote === "string" ? body.adminNote : undefined);
   res.json(formatVendor(vendor, user));
 });
 

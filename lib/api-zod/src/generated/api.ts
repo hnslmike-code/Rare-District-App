@@ -2085,9 +2085,6 @@ export const ListAdminVendorsResponseItem = zod.object({
   "sampleImages": zod.array(zod.string()).optional(),
   "logoUrl": zod.string().nullish(),
   "website": zod.string().nullish(),
-  "bankName": zod.string().nullish(),
-  "accountNumber": zod.string().nullish(),
-  "accountName": zod.string().nullish(),
   "status": zod.enum(['pending', 'approved', 'rejected']),
   "commissionRateOverride": zod.number().nullish(),
   "payoutBalance": zod.number(),
@@ -2097,14 +2094,224 @@ export const ListAdminVendorsResponseItem = zod.object({
   "id": zod.int(),
   "email": zod.string(),
   "name": zod.string().nullish(),
-  "avatarUrl": zod.string().nullish(),
-  "role": zod.enum(['shopper', 'vendor', 'admin']),
-  "referralCode": zod.string(),
-  "referredBy": zod.string().nullish(),
+  "isSuspended": zod.boolean(),
   "createdAt": zod.coerce.date()
 }).optional()
 })
 export const ListAdminVendorsResponse = zod.array(ListAdminVendorsResponseItem)
+
+
+/**
+ * @summary Get an admin-only vendor operations view
+ */
+export const GetAdminVendorDetailParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const getAdminVendorDetailResponseCatalogItemCurrencyDefault = `NGN`;
+
+export const GetAdminVendorDetailResponse = zod.object({
+  "vendor": zod.object({
+  "id": zod.int(),
+  "userId": zod.int(),
+  "brandName": zod.string(),
+  "contactName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "experienceLevel": zod.string().nullish(),
+  "socialLink": zod.string().nullish(),
+  "sampleImages": zod.array(zod.string()).optional(),
+  "logoUrl": zod.string().nullish(),
+  "website": zod.string().nullish(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "commissionRateOverride": zod.number().nullish(),
+  "payoutBalance": zod.number(),
+  "adminNote": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "user": zod.object({
+  "id": zod.int(),
+  "email": zod.string(),
+  "name": zod.string().nullish(),
+  "isSuspended": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}).optional(),
+  "payoutAccount": zod.object({
+  "bankName": zod.string().nullish(),
+  "accountName": zod.string().nullish(),
+  "accountNumberLast4": zod.string().nullish()
+})
+}),
+  "catalog": zod.array(zod.object({
+  "id": zod.int(),
+  "vendorId": zod.int(),
+  "name": zod.string(),
+  "description": zod.string().nullish(),
+  "price": zod.number(),
+  "currency": zod.string().default(getAdminVendorDetailResponseCatalogItemCurrencyDefault),
+  "category": zod.string().nullish(),
+  "sizes": zod.array(zod.string()).optional(),
+  "images": zod.array(zod.string()).optional(),
+  "stock": zod.int(),
+  "isActive": zod.boolean(),
+  "isFeatured": zod.boolean(),
+  "wardrobeCount": zod.int(),
+  "averageRating": zod.number().nullish(),
+  "reviewCount": zod.int(),
+  "createdAt": zod.coerce.date()
+})),
+  "orderItems": zod.array(zod.object({
+  "id": zod.int(),
+  "orderId": zod.int(),
+  "productId": zod.int(),
+  "productName": zod.string(),
+  "quantity": zod.int(),
+  "selectedSize": zod.string().nullish(),
+  "unitPrice": zod.number(),
+  "commissionAmount": zod.number(),
+  "vendorAmount": zod.number(),
+  "fulfillmentStatus": zod.string(),
+  "orderStatus": zod.string(),
+  "orderedAt": zod.coerce.date(),
+  "customer": zod.object({
+  "id": zod.int(),
+  "name": zod.string().nullish(),
+  "email": zod.string()
+}).optional()
+})),
+  "balance": zod.object({
+  "available": zod.number(),
+  "pendingPayouts": zod.number(),
+  "totalPaid": zod.number(),
+  "totalSales": zod.number(),
+  "totalCommission": zod.number()
+}),
+  "payouts": zod.array(zod.object({
+  "id": zod.int(),
+  "amount": zod.number(),
+  "note": zod.string().nullish(),
+  "status": zod.enum(['pending', 'approved', 'paid', 'failed', 'reversed']),
+  "reference": zod.string().nullish(),
+  "reviewedAt": zod.coerce.date().nullish(),
+  "paidAt": zod.coerce.date().nullish(),
+  "createdAt": zod.coerce.date()
+})),
+  "notes": zod.array(zod.object({
+  "id": zod.int(),
+  "action": zod.string().optional(),
+  "entityType": zod.string().optional(),
+  "entityId": zod.string().nullish(),
+  "detail": zod.string().nullish(),
+  "text": zod.string().optional(),
+  "reason": zod.string().optional(),
+  "status": zod.string().optional(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "admin": zod.object({
+  "id": zod.int(),
+  "name": zod.string().nullish(),
+  "email": zod.string()
+}).optional()
+})),
+  "suspensions": zod.array(zod.object({
+  "id": zod.int(),
+  "action": zod.string().optional(),
+  "entityType": zod.string().optional(),
+  "entityId": zod.string().nullish(),
+  "detail": zod.string().nullish(),
+  "text": zod.string().optional(),
+  "reason": zod.string().optional(),
+  "status": zod.string().optional(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "admin": zod.object({
+  "id": zod.int(),
+  "name": zod.string().nullish(),
+  "email": zod.string()
+}).optional()
+})),
+  "decisions": zod.array(zod.object({
+  "id": zod.int(),
+  "action": zod.string().optional(),
+  "entityType": zod.string().optional(),
+  "entityId": zod.string().nullish(),
+  "detail": zod.string().nullish(),
+  "text": zod.string().optional(),
+  "reason": zod.string().optional(),
+  "status": zod.string().optional(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "admin": zod.object({
+  "id": zod.int(),
+  "name": zod.string().nullish(),
+  "email": zod.string()
+}).optional()
+})),
+  "auditEvents": zod.array(zod.object({
+  "id": zod.int(),
+  "action": zod.string().optional(),
+  "entityType": zod.string().optional(),
+  "entityId": zod.string().nullish(),
+  "detail": zod.string().nullish(),
+  "text": zod.string().optional(),
+  "reason": zod.string().optional(),
+  "status": zod.string().optional(),
+  "note": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "admin": zod.object({
+  "id": zod.int(),
+  "name": zod.string().nullish(),
+  "email": zod.string()
+}).optional()
+}))
+})
+
+
+/**
+ * @summary Update vendor commercial terms or internal note
+ */
+export const UpdateAdminVendorParams = zod.object({
+  "id": zod.coerce.number().int()
+})
+
+export const updateAdminVendorBodyCommissionRateOverrideMin = 0;
+export const updateAdminVendorBodyCommissionRateOverrideMax = 100;
+
+export const updateAdminVendorBodyAdminNoteMax = 500;
+
+
+
+export const UpdateAdminVendorBody = zod.object({
+  "commissionRateOverride": zod.number().min(updateAdminVendorBodyCommissionRateOverrideMin).max(updateAdminVendorBodyCommissionRateOverrideMax).nullish(),
+  "adminNote": zod.string().max(updateAdminVendorBodyAdminNoteMax).nullish()
+})
+
+export const UpdateAdminVendorResponse = zod.object({
+  "id": zod.int(),
+  "userId": zod.int(),
+  "brandName": zod.string(),
+  "contactName": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "description": zod.string().nullish(),
+  "category": zod.string().nullish(),
+  "experienceLevel": zod.string().nullish(),
+  "socialLink": zod.string().nullish(),
+  "sampleImages": zod.array(zod.string()).optional(),
+  "logoUrl": zod.string().nullish(),
+  "website": zod.string().nullish(),
+  "status": zod.enum(['pending', 'approved', 'rejected']),
+  "commissionRateOverride": zod.number().nullish(),
+  "payoutBalance": zod.number(),
+  "adminNote": zod.string().nullish(),
+  "createdAt": zod.coerce.date(),
+  "user": zod.object({
+  "id": zod.int(),
+  "email": zod.string(),
+  "name": zod.string().nullish(),
+  "isSuspended": zod.boolean(),
+  "createdAt": zod.coerce.date()
+}).optional()
+})
 
 
 /**
@@ -2132,9 +2339,6 @@ export const UpdateVendorStatusResponse = zod.object({
   "sampleImages": zod.array(zod.string()).optional(),
   "logoUrl": zod.string().nullish(),
   "website": zod.string().nullish(),
-  "bankName": zod.string().nullish(),
-  "accountNumber": zod.string().nullish(),
-  "accountName": zod.string().nullish(),
   "status": zod.enum(['pending', 'approved', 'rejected']),
   "commissionRateOverride": zod.number().nullish(),
   "payoutBalance": zod.number(),
@@ -2144,10 +2348,7 @@ export const UpdateVendorStatusResponse = zod.object({
   "id": zod.int(),
   "email": zod.string(),
   "name": zod.string().nullish(),
-  "avatarUrl": zod.string().nullish(),
-  "role": zod.enum(['shopper', 'vendor', 'admin']),
-  "referralCode": zod.string(),
-  "referredBy": zod.string().nullish(),
+  "isSuspended": zod.boolean(),
   "createdAt": zod.coerce.date()
 }).optional()
 })

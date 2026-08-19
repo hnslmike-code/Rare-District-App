@@ -687,6 +687,235 @@ export interface AdminSettingsUpdate {
   shareRewardValue?: number;
 }
 
+export interface AdminVendorUpdate {
+  /**
+     * @minimum 0
+     * @maximum 100
+     * @nullable
+     */
+  commissionRateOverride?: number | null;
+  /**
+     * @maxLength 500
+     * @nullable
+     */
+  adminNote?: string | null;
+}
+
+export interface AdminVendorUser {
+  id: number;
+  email: string;
+  /** @nullable */
+  name?: string | null;
+  isSuspended: boolean;
+  createdAt: string;
+}
+
+export type AdminVendorSummaryStatus = typeof AdminVendorSummaryStatus[keyof typeof AdminVendorSummaryStatus];
+
+
+export const AdminVendorSummaryStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface AdminVendorSummary {
+  id: number;
+  userId: number;
+  brandName: string;
+  /** @nullable */
+  contactName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  experienceLevel?: string | null;
+  /** @nullable */
+  socialLink?: string | null;
+  sampleImages?: string[];
+  /** @nullable */
+  logoUrl?: string | null;
+  /** @nullable */
+  website?: string | null;
+  status: AdminVendorSummaryStatus;
+  /** @nullable */
+  commissionRateOverride?: number | null;
+  payoutBalance: number;
+  /** @nullable */
+  adminNote?: string | null;
+  createdAt: string;
+  user?: AdminVendorUser;
+}
+
+export interface AdminVendorPayoutAccount {
+  /** @nullable */
+  bankName?: string | null;
+  /** @nullable */
+  accountName?: string | null;
+  /** @nullable */
+  accountNumberLast4?: string | null;
+}
+
+export interface AdminVendorCatalogProduct {
+  id: number;
+  vendorId: number;
+  name: string;
+  /** @nullable */
+  description?: string | null;
+  price: number;
+  currency: string;
+  /** @nullable */
+  category?: string | null;
+  sizes?: string[];
+  images?: string[];
+  stock: number;
+  isActive: boolean;
+  isFeatured: boolean;
+  wardrobeCount: number;
+  /** @nullable */
+  averageRating?: number | null;
+  reviewCount: number;
+  createdAt: string;
+}
+
+export interface AdminVendorCustomer {
+  id: number;
+  /** @nullable */
+  name?: string | null;
+  email: string;
+}
+
+export interface AdminVendorOrderItem {
+  id: number;
+  orderId: number;
+  productId: number;
+  productName: string;
+  quantity: number;
+  /** @nullable */
+  selectedSize?: string | null;
+  unitPrice: number;
+  commissionAmount: number;
+  vendorAmount: number;
+  fulfillmentStatus: string;
+  orderStatus: string;
+  orderedAt: string;
+  customer?: AdminVendorCustomer;
+}
+
+export interface AdminVendorBalance {
+  available: number;
+  pendingPayouts: number;
+  totalPaid: number;
+  totalSales: number;
+  totalCommission: number;
+}
+
+export type AdminVendorPayoutStatus = typeof AdminVendorPayoutStatus[keyof typeof AdminVendorPayoutStatus];
+
+
+export const AdminVendorPayoutStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  paid: 'paid',
+  failed: 'failed',
+  reversed: 'reversed',
+} as const;
+
+export interface AdminVendorPayout {
+  id: number;
+  amount: number;
+  /** @nullable */
+  note?: string | null;
+  status: AdminVendorPayoutStatus;
+  /** @nullable */
+  reference?: string | null;
+  /** @nullable */
+  reviewedAt?: string | null;
+  /** @nullable */
+  paidAt?: string | null;
+  createdAt: string;
+}
+
+export type AdminVendorHistoryEventAdmin = {
+  id: number;
+  /** @nullable */
+  name?: string | null;
+  email: string;
+};
+
+export interface AdminVendorHistoryEvent {
+  id: number;
+  action?: string;
+  entityType?: string;
+  /** @nullable */
+  entityId?: string | null;
+  /** @nullable */
+  detail?: string | null;
+  text?: string;
+  reason?: string;
+  status?: string;
+  /** @nullable */
+  note?: string | null;
+  createdAt: string;
+  admin?: AdminVendorHistoryEventAdmin;
+}
+
+export type AdminVendorDetailVendorStatus = typeof AdminVendorDetailVendorStatus[keyof typeof AdminVendorDetailVendorStatus];
+
+
+export const AdminVendorDetailVendorStatus = {
+  pending: 'pending',
+  approved: 'approved',
+  rejected: 'rejected',
+} as const;
+
+export interface AdminVendorDetailVendor {
+  id: number;
+  userId: number;
+  brandName: string;
+  /** @nullable */
+  contactName?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  /** @nullable */
+  description?: string | null;
+  /** @nullable */
+  category?: string | null;
+  /** @nullable */
+  experienceLevel?: string | null;
+  /** @nullable */
+  socialLink?: string | null;
+  sampleImages?: string[];
+  /** @nullable */
+  logoUrl?: string | null;
+  /** @nullable */
+  website?: string | null;
+  status: AdminVendorDetailVendorStatus;
+  /** @nullable */
+  commissionRateOverride?: number | null;
+  payoutBalance: number;
+  /** @nullable */
+  adminNote?: string | null;
+  createdAt: string;
+  user?: AdminVendorUser;
+  payoutAccount: AdminVendorPayoutAccount;
+}
+
+export interface AdminVendorDetail {
+  vendor: AdminVendorDetailVendor;
+  catalog: AdminVendorCatalogProduct[];
+  orderItems: AdminVendorOrderItem[];
+  balance: AdminVendorBalance;
+  payouts: AdminVendorPayout[];
+  notes: AdminVendorHistoryEvent[];
+  suspensions: AdminVendorHistoryEvent[];
+  decisions: AdminVendorHistoryEvent[];
+  auditEvents: AdminVendorHistoryEvent[];
+}
+
 export type TransactionProcessor = typeof TransactionProcessor[keyof typeof TransactionProcessor];
 
 

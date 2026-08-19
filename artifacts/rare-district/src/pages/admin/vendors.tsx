@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useListAdminVendors, useUpdateVendorStatus, getListAdminVendorsQueryKey, type ListAdminVendorsStatus, type VendorStatusUpdateStatus } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -72,7 +73,9 @@ export default function AdminVendors() {
                   {vendor.brandName.charAt(0)}
                 </div>
                   <div className="min-w-0">
-                  <p className="font-bold text-base">{vendor.brandName}</p>
+                  <Link href={`/admin/vendors/${vendor.id}`} className="hover:underline underline-offset-4">
+                    <p className="font-bold text-base">{vendor.brandName}</p>
+                  </Link>
                     <p className="text-sm text-muted-foreground truncate">{vendor.contactName || "Applicant"} {vendor.phone ? `· ${vendor.phone}` : ""}</p>
                     <p className="text-xs text-muted-foreground truncate">{vendor.user?.email}</p>
                     {vendor.category || vendor.experienceLevel ? <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-primary">{[vendor.category, vendor.experienceLevel].filter(Boolean).join(" · ")}</p> : null}
@@ -87,6 +90,11 @@ export default function AdminVendors() {
                 <span className={`text-xs font-bold tracking-widest uppercase px-2 py-1 rounded ${statusColors[vendor.status] ?? "bg-secondary"}`}>
                   {vendor.status}
                 </span>
+                <Link href={`/admin/vendors/${vendor.id}`}>
+                  <Button size="sm" variant="outline" className="rounded-none h-8">
+                    View
+                  </Button>
+                </Link>
                 {vendor.status === "pending" && (
                   <>
                     <Button

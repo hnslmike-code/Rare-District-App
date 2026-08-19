@@ -40,6 +40,7 @@ import VendorSettings from '@/pages/vendor-dashboard/settings';
 import AdminLogin from '@/pages/admin/login';
 import AdminDashboard from '@/pages/admin/index';
 import AdminVendors from '@/pages/admin/vendors';
+import AdminVendorDetail from '@/pages/admin/vendor-detail';
 import AdminProducts from '@/pages/admin/products';
 import AdminOrders from '@/pages/admin/orders';
 import AdminTransactions from '@/pages/admin/transactions';
@@ -160,6 +161,7 @@ function Router() {
 
       {/* Admin */}
       <Route path="/admin/login" component={AdminLogin} />
+      <Route path="/admin/vendors/:id" component={() => <AdminRoute component={AdminVendorDetail} />} />
       <Route path="/admin/vendors" component={() => <AdminRoute component={AdminVendors} />} />
       <Route path="/admin/products" component={() => <AdminRoute component={AdminProducts} />} />
       <Route path="/admin/orders" component={() => <AdminRoute component={AdminOrders} />} />

@@ -23,6 +23,9 @@ import type {
   AdminSettings,
   AdminSettingsUpdate,
   AdminStats,
+  AdminVendorDetail,
+  AdminVendorSummary,
+  AdminVendorUpdate,
   AuthResponse,
   Category,
   CategoryInput,
@@ -3721,9 +3724,9 @@ export const getListAdminVendorsUrl = (params?: ListAdminVendorsParams,) => {
 /**
  * @summary List all vendors with optional status filter
  */
-export const listAdminVendors = async (params?: ListAdminVendorsParams, options?: Parameters<typeof customFetch>[1]): Promise<Vendor[]> => {
+export const listAdminVendors = async (params?: ListAdminVendorsParams, options?: Parameters<typeof customFetch>[1]): Promise<AdminVendorSummary[]> => {
 
-  return customFetch<Vendor[]>(getListAdminVendorsUrl(params),
+  return customFetch<AdminVendorSummary[]>(getListAdminVendorsUrl(params),
   {
     ...options,
     method: 'GET'
@@ -3787,6 +3790,155 @@ export function useListAdminVendors<TData = Awaited<ReturnType<typeof listAdminV
 
 
 
+export const getGetAdminVendorDetailUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/vendors/${id}`
+}
+
+/**
+ * @summary Get an admin-only vendor operations view
+ */
+export const getAdminVendorDetail = async (id: number, options?: Parameters<typeof customFetch>[1]): Promise<AdminVendorDetail> => {
+
+  return customFetch<AdminVendorDetail>(getGetAdminVendorDetailUrl(id),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminVendorDetailQueryKey = (id: number,) => {
+    return [
+    `/api/admin/vendors/${id}`
+    ] as const;
+    }
+
+
+export const getGetAdminVendorDetailQueryOptions = <TData = Awaited<ReturnType<typeof getAdminVendorDetail>>, TError = ErrorType<void>>(id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminVendorDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminVendorDetailQueryKey(id);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminVendorDetail>>> = ({ signal }) => getAdminVendorDetail(id, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: id !== null && id !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminVendorDetail>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminVendorDetailQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminVendorDetail>>>
+export type GetAdminVendorDetailQueryError = ErrorType<void>
+
+
+/**
+ * @summary Get an admin-only vendor operations view
+ */
+
+export function useGetAdminVendorDetail<TData = Awaited<ReturnType<typeof getAdminVendorDetail>>, TError = ErrorType<void>>(
+ id: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminVendorDetail>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminVendorDetailQueryOptions(id,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAdminVendorUrl = (id: number,) => {
+
+
+
+
+  return `/api/admin/vendors/${id}`
+}
+
+/**
+ * @summary Update vendor commercial terms or internal note
+ */
+export const updateAdminVendor = async (id: number,
+    adminVendorUpdate: AdminVendorUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AdminVendorSummary> => {
+
+  return customFetch<AdminVendorSummary>(getUpdateAdminVendorUrl(id),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(adminVendorUpdate)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminVendorMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminVendor>>, TError,{id: number;data: BodyType<AdminVendorUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminVendor>>, TError,{id: number;data: BodyType<AdminVendorUpdate>}, TContext> => {
+
+const mutationKey = ['updateAdminVendor'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminVendor>>, {id: number;data: BodyType<AdminVendorUpdate>}> = (props) => {
+          const {id,data} = props ?? {};
+
+          return  updateAdminVendor(id,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminVendorMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminVendor>>>
+    export type UpdateAdminVendorMutationBody = BodyType<AdminVendorUpdate>
+    export type UpdateAdminVendorMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Update vendor commercial terms or internal note
+ */
+export const useUpdateAdminVendor = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminVendor>>, TError,{id: number;data: BodyType<AdminVendorUpdate>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminVendor>>,
+        TError,
+        {id: number;data: BodyType<AdminVendorUpdate>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminVendorMutationOptions(options));
+    }
+
 export const getUpdateVendorStatusUrl = (id: number,) => {
 
 
@@ -3799,9 +3951,9 @@ export const getUpdateVendorStatusUrl = (id: number,) => {
  * @summary Approve or reject a vendor application
  */
 export const updateVendorStatus = async (id: number,
-    vendorStatusUpdate: VendorStatusUpdate, options?: Parameters<typeof customFetch>[1]): Promise<Vendor> => {
+    vendorStatusUpdate: VendorStatusUpdate, options?: Parameters<typeof customFetch>[1]): Promise<AdminVendorSummary> => {
 
-  return customFetch<Vendor>(getUpdateVendorStatusUrl(id),
+  return customFetch<AdminVendorSummary>(getUpdateVendorStatusUrl(id),
   {
     ...options,
     method: 'PATCH',

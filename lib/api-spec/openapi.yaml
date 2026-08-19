@@ -1049,7 +1049,51 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Vendor"
+                  $ref: "#/components/schemas/AdminVendorSummary"
+
+  /admin/vendors/{id}:
+    get:
+      operationId: getAdminVendorDetail
+      tags: [Admin]
+      summary: Get an admin-only vendor operations view
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Vendor operations detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVendorDetail"
+        "404":
+          description: Vendor not found
+    patch:
+      operationId: updateAdminVendor
+      tags: [Admin]
+      summary: Update vendor commercial terms or internal note
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminVendorUpdate"
+      responses:
+        "200":
+          description: Updated vendor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminVendorSummary"
 
   /admin/vendors/{id}/status:
     patch:
@@ -1074,7 +1118,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Vendor"
+                $ref: "#/components/schemas/AdminVendorSummary"
 
   /admin/products:
     get:
@@ -2309,6 +2353,334 @@ components:
           enum: [percentage, fixed]
         shareRewardValue:
           type: number
+
+    AdminVendorUpdate:
+      type: object
+      properties:
+        commissionRateOverride:
+          type: ["number", "null"]
+          minimum: 0
+          maximum: 100
+        adminNote:
+          type: ["string", "null"]
+          maxLength: 500
+
+    AdminVendorUser:
+      type: object
+      required: [id, email, isSuspended, createdAt]
+      properties:
+        id:
+          type: integer
+        email:
+          type: string
+        name:
+          type: ["string", "null"]
+        isSuspended:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminVendorSummary:
+      type: object
+      required: [id, userId, brandName, status, payoutBalance, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        brandName:
+          type: string
+        contactName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        experienceLevel:
+          type: ["string", "null"]
+        socialLink:
+          type: ["string", "null"]
+        sampleImages:
+          type: array
+          items:
+            type: string
+        logoUrl:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        commissionRateOverride:
+          type: ["number", "null"]
+        payoutBalance:
+          type: number
+        adminNote:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/AdminVendorUser"
+
+    AdminVendorPayoutAccount:
+      type: object
+      properties:
+        bankName:
+          type: ["string", "null"]
+        accountName:
+          type: ["string", "null"]
+        accountNumberLast4:
+          type: ["string", "null"]
+
+    AdminVendorCatalogProduct:
+      type: object
+      required: [id, vendorId, name, price, currency, stock, isActive, isFeatured, wardrobeCount, reviewCount, createdAt]
+      properties:
+        id:
+          type: integer
+        vendorId:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        price:
+          type: number
+        currency:
+          type: string
+          default: NGN
+        category:
+          type: ["string", "null"]
+        sizes:
+          type: array
+          items:
+            type: string
+        images:
+          type: array
+          items:
+            type: string
+        stock:
+          type: integer
+        isActive:
+          type: boolean
+        isFeatured:
+          type: boolean
+        wardrobeCount:
+          type: integer
+        averageRating:
+          type: ["number", "null"]
+        reviewCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminVendorOrderItem:
+      type: object
+      required: [id, orderId, productId, productName, quantity, unitPrice, commissionAmount, vendorAmount, fulfillmentStatus, orderStatus, orderedAt]
+      properties:
+        id:
+          type: integer
+        orderId:
+          type: integer
+        productId:
+          type: integer
+        productName:
+          type: string
+        quantity:
+          type: integer
+        selectedSize:
+          type: ["string", "null"]
+        unitPrice:
+          type: number
+        commissionAmount:
+          type: number
+        vendorAmount:
+          type: number
+        fulfillmentStatus:
+          type: string
+        orderStatus:
+          type: string
+        orderedAt:
+          type: string
+          format: date-time
+        customer:
+          $ref: "#/components/schemas/AdminVendorCustomer"
+
+    AdminVendorCustomer:
+      type: object
+      required: [id, email]
+      properties:
+        id:
+          type: integer
+        name:
+          type: ["string", "null"]
+        email:
+          type: string
+
+    AdminVendorBalance:
+      type: object
+      required: [available, pendingPayouts, totalPaid, totalSales, totalCommission]
+      properties:
+        available:
+          type: number
+        pendingPayouts:
+          type: number
+        totalPaid:
+          type: number
+        totalSales:
+          type: number
+        totalCommission:
+          type: number
+
+    AdminVendorPayout:
+      type: object
+      required: [id, amount, status, createdAt]
+      properties:
+        id:
+          type: integer
+        amount:
+          type: number
+        note:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, approved, paid, failed, reversed]
+        reference:
+          type: ["string", "null"]
+        reviewedAt:
+          type: ["string", "null"]
+          format: date-time
+        paidAt:
+          type: ["string", "null"]
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    AdminVendorHistoryEvent:
+      type: object
+      required: [id, createdAt]
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        entityType:
+          type: string
+        entityId:
+          type: ["string", "null"]
+        detail:
+          type: ["string", "null"]
+        text:
+          type: string
+        reason:
+          type: string
+        status:
+          type: string
+        note:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        admin:
+          type: object
+          required: [id, email]
+          properties:
+            id:
+              type: integer
+            name:
+              type: ["string", "null"]
+            email:
+              type: string
+
+    AdminVendorDetailVendor:
+      type: object
+      required: [id, userId, brandName, status, payoutBalance, createdAt, payoutAccount]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        brandName:
+          type: string
+        contactName:
+          type: ["string", "null"]
+        phone:
+          type: ["string", "null"]
+        description:
+          type: ["string", "null"]
+        category:
+          type: ["string", "null"]
+        experienceLevel:
+          type: ["string", "null"]
+        socialLink:
+          type: ["string", "null"]
+        sampleImages:
+          type: array
+          items:
+            type: string
+        logoUrl:
+          type: ["string", "null"]
+        website:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        commissionRateOverride:
+          type: ["number", "null"]
+        payoutBalance:
+          type: number
+        adminNote:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        user:
+          $ref: "#/components/schemas/AdminVendorUser"
+        payoutAccount:
+          $ref: "#/components/schemas/AdminVendorPayoutAccount"
+
+    AdminVendorDetail:
+      type: object
+      required: [vendor, catalog, orderItems, balance, payouts, notes, suspensions, decisions, auditEvents]
+      properties:
+        vendor:
+          $ref: "#/components/schemas/AdminVendorDetailVendor"
+        catalog:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminVendorCatalogProduct"
+        orderItems:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminVendorOrderItem"
+        balance:
+          $ref: "#/components/schemas/AdminVendorBalance"
+        payouts:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminVendorPayout"
+        notes:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminVendorHistoryEvent"
+        suspensions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminVendorHistoryEvent"
+        decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminVendorHistoryEvent"
+        auditEvents:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminVendorHistoryEvent"
 
     Transaction:
       type: object
