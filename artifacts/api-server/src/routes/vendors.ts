@@ -11,7 +11,13 @@ function formatVendor(v: typeof vendorsTable.$inferSelect, user?: typeof usersTa
     id: v.id,
     userId: v.userId,
     brandName: v.brandName,
+    contactName: v.contactName,
+    phone: v.phone,
     description: v.description,
+    category: v.category,
+    experienceLevel: v.experienceLevel,
+    socialLink: v.socialLink,
+    sampleImages: v.sampleImages,
     logoUrl: v.logoUrl,
     website: v.website,
     bankName: v.bankName,
@@ -41,6 +47,9 @@ router.post("/vendors/apply", requireAuth, async (req, res): Promise<void> => {
   const [vendor] = await db.insert(vendorsTable).values({ ...parsed.data, userId: req.user!.userId }).returning();
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.userId));
   // Update user role to vendor
+  if (parsed.data.contactName) {
+    await db.update(usersTable).set({ name: parsed.data.contactName }).where(eq(usersTable.id, req.user!.userId));
+  }
   await db.update(usersTable).set({ role: "vendor" }).where(eq(usersTable.id, req.user!.userId));
   res.status(201).json(formatVendor(vendor, user));
 });
@@ -70,7 +79,13 @@ router.patch("/vendors/me", requireAuth, async (req, res): Promise<void> => {
   }
   const updates: Record<string, unknown> = {};
   if (parsed.data.brandName != null) updates.brandName = parsed.data.brandName;
+  if (parsed.data.contactName != null) updates.contactName = parsed.data.contactName;
+  if (parsed.data.phone != null) updates.phone = parsed.data.phone;
   if (parsed.data.description != null) updates.description = parsed.data.description;
+  if (parsed.data.category != null) updates.category = parsed.data.category;
+  if (parsed.data.experienceLevel != null) updates.experienceLevel = parsed.data.experienceLevel;
+  if (parsed.data.socialLink != null) updates.socialLink = parsed.data.socialLink;
+  if (parsed.data.sampleImages != null) updates.sampleImages = parsed.data.sampleImages;
   if (parsed.data.logoUrl != null) updates.logoUrl = parsed.data.logoUrl;
   if (parsed.data.website != null) updates.website = parsed.data.website;
   if (parsed.data.bankName != null) updates.bankName = parsed.data.bankName;

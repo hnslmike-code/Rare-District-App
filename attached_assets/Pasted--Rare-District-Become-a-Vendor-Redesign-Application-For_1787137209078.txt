@@ -1,0 +1,48 @@
+# Rare District — "Become a Vendor" Redesign + Application Form
+
+Paste into Replit's Agent on the existing Rare District project. This touches ONLY this one page — its design and its signup form fields. Do not modify any other page, the main site theme, shared/global components beyond this page, or backend logic outside what's needed to support the new fields.
+
+---
+
+## PROMPT START
+
+Redesign the "Become a Vendor" landing page and upgrade its signup form into a real vetting application. Keep everything else on the site untouched.
+
+### 1. Creative Direction
+Give this page a **retro, digital-native Gen Z aesthetic** — bold glitch-culture internet energy, distinct from Rare District's main black/white/gold luxury-space brand elsewhere on the site. Bold oversized type, glitch/chromatic-aberration text effects, playful asymmetric layouts, punchy saturated color combos, meme-adjacent visual energy used tastefully. Motion should feel internet-native — glitchy hover states, text that jitters/shifts on interaction, scroll-triggered chaos. Target: an 18–25 year old in Lagos or London would screenshot and share this page.
+
+**You have creative freedom — think outside the box.** Don't default to a generic template. Push typography, layout, and interaction further than usual, as long as it stays legible, performant, and mobile-first (this audience is mobile-first — design for mobile as the primary target, not an afterthought).
+
+Write persuasive, punchy, authentic Gen Z copy convincing a young independent brand to apply — use your judgement on the actual selling points and messaging. Confident and direct, not try-hard or over-explained.
+
+### 2. Application Form Fields
+Upgrade the existing signup form into a full vetting application with these fields:
+
+**Contact**
+- Full name
+- Email
+- Phone / WhatsApp number
+
+**Brand details**
+- Brand name
+- Category (dropdown: streetwear, luxury, accessories, footwear, or similar — adapt to the site's actual existing product categories if there's already a category list in the codebase, don't invent a separate one)
+- Short brand description/bio (a few sentences)
+- How long they've been selling/operating (dropdown or free text: e.g. "just starting," "under 1 year," "1-3 years," "3+ years")
+
+**Vetting materials**
+- Instagram handle or portfolio/website link (required — this is core to the vetting process for a curated marketplace)
+- 3–5 sample photo uploads of their work/product
+
+**Explicitly do NOT collect at this stage**: bank details, payout information, or any financial account info. Those are only collected after an application is approved, in the existing post-approval vendor onboarding flow — don't add them here.
+
+### 3. Backend/Data Handling
+- Extend the vendor application data model to store the new fields (photos, social/portfolio link, category, bio, experience level) alongside the existing pending/approved/rejected status.
+- Applications should land in the existing admin approval queue with these new fields visible for review (so admin can actually see the photos and social link when deciding).
+- Keep the approval/rejection flow itself as-is — only the data being submitted and displayed changes.
+
+### 4. Constraints
+- Do not change any other page's design, the main site's black/white/gold theme, or shared/global components (nav, footer, etc.) — if this page reuses global components, override styles locally for this page only.
+- Do not touch checkout, payments, vendor dashboard (post-approval), or any other existing feature.
+- Fully responsive, mobile-first.
+
+## PROMPT END

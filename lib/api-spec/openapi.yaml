@@ -1403,6 +1403,24 @@ components:
         brandName:
           type: string
           minLength: 2
+        contactName:
+          type: string
+          minLength: 2
+        phone:
+          type: string
+        category:
+          type: string
+        experienceLevel:
+          type: string
+        socialLink:
+          type: string
+          format: uri
+        sampleImages:
+          type: array
+          minItems: 3
+          maxItems: 5
+          items:
+            type: string
         description:
           type: string
         logoUrl:
@@ -1421,6 +1439,23 @@ components:
       properties:
         brandName:
           type: string
+        contactName:
+          type: string
+        phone:
+          type: string
+        category:
+          type: string
+        experienceLevel:
+          type: string
+        socialLink:
+          type: string
+          format: uri
+        sampleImages:
+          type: array
+          minItems: 3
+          maxItems: 5
+          items:
+            type: string
         description:
           type: string
         logoUrl:
