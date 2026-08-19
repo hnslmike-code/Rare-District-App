@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql, and } from "drizzle-orm";
-import { db, vendorsTable, usersTable, productsTable, ordersTable, orderItemsTable, vendorJoinPageConfigsTable } from "@workspace/db";
+import { eq, desc, sql, and, inArray } from "drizzle-orm";
+import { db, vendorsTable, usersTable, productsTable, ordersTable, orderItemsTable, transactionsTable, vendorJoinPageConfigsTable } from "@workspace/db";
 import { ApplyAsVendorBody, UpdateMyVendorProfileBody, GetVendorParams, GetVendorRecentOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { defaultVendorJoinPageContent, normalizeVendorJoinPageContent } from "../lib/vendor-join-content";
@@ -33,6 +33,28 @@ function formatVendor(v: typeof vendorsTable.$inferSelect, user?: typeof usersTa
     createdAt: v.createdAt,
     user: user ? { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl, role: user.role, referralCode: user.referralCode, referredBy: user.referredBy, createdAt: user.createdAt } : undefined,
   };
+}
+
+function formatPublicVendor(v: typeof vendorsTable.$inferSelect) {
+  return {
+    id: v.id,
+    brandName: v.brandName,
+    description: v.description,
+    category: v.category,
+    logoUrl: v.logoUrl,
+    website: v.website,
+    socialLink: v.socialLink,
+    status: v.status,
+    createdAt: v.createdAt,
+  };
+}
+
+async function getApprovedVendor(userId: number) {
+  const [vendor] = await db.select().from(vendorsTable).where(and(
+    eq(vendorsTable.userId, userId),
+    eq(vendorsTable.status, "approved"),
+  ));
+  return vendor;
 }
 
 async function getPublishedVendorJoinRules() {
@@ -125,9 +147,13 @@ router.patch("/vendors/me", requireAuth, async (req, res): Promise<void> => {
   if (parsed.data.sampleImages != null) updates.sampleImages = parsed.data.sampleImages;
   if (parsed.data.logoUrl != null) updates.logoUrl = parsed.data.logoUrl;
   if (parsed.data.website != null) updates.website = parsed.data.website;
-  if (parsed.data.bankName != null) updates.bankName = parsed.data.bankName;
-  if (parsed.data.accountNumber != null) updates.accountNumber = parsed.data.accountNumber;
-  if (parsed.data.accountName != null) updates.accountName = parsed.data.accountName;
+  // Payout details are only mutable after approval; the public/profile surface
+  // never returns them and the dashboard editor does not render them.
+  if (existing.status === "approved") {
+    if (parsed.data.bankName != null) updates.bankName = parsed.data.bankName;
+    if (parsed.data.accountNumber != null) updates.accountNumber = parsed.data.accountNumber;
+    if (parsed.data.accountName != null) updates.accountName = parsed.data.accountName;
+  }
 
   const [vendor] = await db.update(vendorsTable).set(updates).where(eq(vendorsTable.id, existing.id)).returning();
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.userId));
@@ -136,14 +162,17 @@ router.patch("/vendors/me", requireAuth, async (req, res): Promise<void> => {
 
 // GET /vendors/dashboard
 router.get("/vendors/dashboard", requireAuth, async (req, res): Promise<void> => {
-  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, req.user!.userId));
+  const vendor = await getApprovedVendor(req.user!.userId);
   if (!vendor) {
-    res.status(404).json({ error: "Not a vendor" });
+    res.status(403).json({ error: "Vendor approval is required for dashboard access." });
     return;
   }
 
-  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.vendorId, vendor.id));
-  const totalRevenue = items.reduce((sum, i) => sum + parseFloat(i.vendorAmount), 0);
+  const transactions = await db.select().from(transactionsTable).where(and(
+    eq(transactionsTable.vendorId, vendor.id),
+    eq(transactionsTable.status, "success"),
+  ));
+  const totalRevenue = transactions.reduce((sum, transaction) => sum + parseFloat(transaction.vendorAmount), 0);
   const orders = await db.select().from(ordersTable)
     .where(sql`id IN (SELECT DISTINCT order_id FROM order_items WHERE vendor_id = ${vendor.id})`);
   const pendingOrders = orders.filter(o => o.status === "paid" || o.status === "processing").length;
@@ -154,13 +183,22 @@ router.get("/vendors/dashboard", requireAuth, async (req, res): Promise<void> =>
     .orderBy(desc(productsTable.wardrobeCount))
     .limit(5);
 
+  const monthlyRows = await db.select({
+    month: sql<string>`to_char(date_trunc('month', ${transactionsTable.createdAt}), 'Mon YYYY')`,
+    revenue: sql<number>`coalesce(sum(${transactionsTable.vendorAmount}), 0)`,
+  }).from(transactionsTable).where(and(
+    eq(transactionsTable.vendorId, vendor.id),
+    eq(transactionsTable.status, "success"),
+    sql`${transactionsTable.createdAt} >= now() - interval '6 months'`,
+  )).groupBy(sql`date_trunc('month', ${transactionsTable.createdAt})`).orderBy(sql`date_trunc('month', ${transactionsTable.createdAt})`);
+
   res.json({
     totalRevenue,
     totalOrders: orders.length,
     pendingOrders,
     totalProducts: products.length,
     payoutBalance: parseFloat(vendor.payoutBalance ?? "0"),
-    monthlySales: [],
+    monthlySales: monthlyRows.map(row => ({ month: row.month, revenue: Number(row.revenue) })),
     topProducts: topProducts.map(p => ({
       id: p.id, vendorId: p.vendorId, name: p.name, description: p.description,
       price: parseFloat(p.price), currency: p.currency, category: p.category,
@@ -173,9 +211,9 @@ router.get("/vendors/dashboard", requireAuth, async (req, res): Promise<void> =>
 
 // GET /vendors/dashboard/recent-orders
 router.get("/vendors/dashboard/recent-orders", requireAuth, async (req, res): Promise<void> => {
-  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, req.user!.userId));
+  const vendor = await getApprovedVendor(req.user!.userId);
   if (!vendor) {
-    res.status(404).json({ error: "Not a vendor" });
+    res.status(403).json({ error: "Vendor approval is required for order access." });
     return;
   }
   const parsed = GetVendorRecentOrdersQueryParams.safeParse(req.query);
@@ -186,15 +224,39 @@ router.get("/vendors/dashboard/recent-orders", requireAuth, async (req, res): Pr
     .orderBy(desc(ordersTable.createdAt))
     .limit(limit);
 
-  res.json(recentOrders.map(o => ({
-    id: o.id, userId: o.userId, status: o.status,
-    totalAmount: parseFloat(o.totalAmount), discountAmount: parseFloat(o.discountAmount ?? "0"),
-    currency: o.currency, shippingAddress: o.shippingAddress,
-    shippingCity: o.shippingCity, shippingState: o.shippingState,
-    shippingPhone: o.shippingPhone, couponCode: o.couponCode,
-    paymentProcessor: o.paymentProcessor, paymentReference: o.paymentReference,
-    createdAt: o.createdAt, items: [],
-  })));
+  const result = await Promise.all(recentOrders.map(async (o) => {
+    const items = await db.select({
+      id: orderItemsTable.id,
+      orderId: orderItemsTable.orderId,
+      productId: orderItemsTable.productId,
+      vendorId: orderItemsTable.vendorId,
+      quantity: orderItemsTable.quantity,
+      selectedSize: orderItemsTable.selectedSize,
+      unitPrice: orderItemsTable.unitPrice,
+      commissionRate: orderItemsTable.commissionRate,
+      commissionAmount: orderItemsTable.commissionAmount,
+      vendorAmount: orderItemsTable.vendorAmount,
+      productName: productsTable.name,
+      productImages: productsTable.images,
+    }).from(orderItemsTable)
+      .leftJoin(productsTable, eq(productsTable.id, orderItemsTable.productId))
+      .where(and(eq(orderItemsTable.orderId, o.id), eq(orderItemsTable.vendorId, vendor.id)));
+    return {
+      id: o.id, userId: o.userId, status: o.status,
+      totalAmount: parseFloat(o.totalAmount), discountAmount: parseFloat(o.discountAmount ?? "0"),
+      currency: o.currency, shippingAddress: o.shippingAddress,
+      shippingCity: o.shippingCity, shippingState: o.shippingState,
+      shippingPhone: o.shippingPhone, createdAt: o.createdAt,
+      items: items.map(item => ({
+        id: item.id, orderId: item.orderId, productId: item.productId, vendorId: item.vendorId,
+        quantity: item.quantity, selectedSize: item.selectedSize,
+        unitPrice: parseFloat(item.unitPrice), commissionRate: parseFloat(item.commissionRate),
+        commissionAmount: parseFloat(item.commissionAmount), vendorAmount: parseFloat(item.vendorAmount),
+        product: item.productName ? { id: item.productId, name: item.productName, images: item.productImages ?? [] } : undefined,
+      })),
+    };
+  }));
+  res.json(result);
 });
 
 // GET /vendors/:id
@@ -212,7 +274,7 @@ router.get("/vendors/:id", async (req, res): Promise<void> => {
     return;
   }
   const [user] = await db.select().from(usersTable).where(eq(usersTable.id, vendor.userId));
-  res.json(formatVendor(vendor, user));
+  res.json(formatPublicVendor(vendor));
 });
 
 export default router;

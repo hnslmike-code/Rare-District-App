@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Route, Switch, Router as WouterRouter, useLocation } from 'wouter';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useGetMyVendorProfile } from "@workspace/api-client-react";
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -32,6 +33,8 @@ import VendorDashboard from '@/pages/vendor-dashboard/index';
 import VendorApply from '@/pages/vendor-dashboard/apply';
 import VendorProducts from '@/pages/vendor-dashboard/products/index';
 import VendorNewProduct from '@/pages/vendor-dashboard/products/new';
+import VendorOrders from '@/pages/vendor-dashboard/orders';
+import VendorSettings from '@/pages/vendor-dashboard/settings';
 
 // Admin
 import AdminLogin from '@/pages/admin/login';
@@ -74,16 +77,24 @@ const AdminRoute = ({ component: Component }: { component: React.ComponentType }
 };
 
 const VendorRoute = ({ component: Component }: { component: React.ComponentType }) => {
-  const { isVendor, isLoading, isAuthenticated } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
+  const { data: profile, isLoading: isLoadingProfile } = useGetMyVendorProfile({
+    query: { enabled: isAuthenticated, retry: false, queryKey: ["/api/vendors/me"] },
+  });
   const [, setLocation] = useLocation();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       setLocation("/login");
     }
-  }, [isVendor, isLoading, isAuthenticated, setLocation]);
+    if (!isLoading && !isLoadingProfile && isAuthenticated && profile && profile.status !== "approved") {
+      setLocation("/vendor-dashboard/apply");
+    }
+  }, [isLoading, isLoadingProfile, isAuthenticated, profile, setLocation]);
 
-  if (isLoading) return <div className="h-screen flex items-center justify-center text-muted-foreground text-sm tracking-widest uppercase">Loading...</div>;
+  if (isLoading || isLoadingProfile || !isAuthenticated || !profile || profile.status !== "approved") {
+    return <div className="h-screen flex items-center justify-center text-muted-foreground text-sm tracking-widest uppercase">Checking vendor access...</div>;
+  }
 
   return (
     <DashboardLayout>
@@ -143,6 +154,8 @@ function Router() {
       <Route path="/vendor-dashboard/apply" component={() => <PublicRoute component={VendorApply} />} />
       <Route path="/vendor-dashboard/products/new" component={() => <VendorRoute component={VendorNewProduct} />} />
       <Route path="/vendor-dashboard/products" component={() => <VendorRoute component={VendorProducts} />} />
+      <Route path="/vendor-dashboard/orders" component={() => <VendorRoute component={VendorOrders} />} />
+      <Route path="/vendor-dashboard/settings" component={() => <VendorRoute component={VendorSettings} />} />
       <Route path="/vendor-dashboard" component={() => <VendorRoute component={VendorDashboard} />} />
 
       {/* Admin */}

@@ -18,7 +18,7 @@ router.post("/payments/paystack/initiate", requireAuth, async (req, res): Promis
   }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, parsed.data.orderId));
-  if (!order) {
+  if (!order || (order.userId !== req.user!.userId && req.user!.role !== "admin")) {
     res.status(404).json({ error: "Order not found" });
     return;
   }
@@ -60,7 +60,7 @@ router.post("/payments/flutterwave/initiate", requireAuth, async (req, res): Pro
   }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, parsed.data.orderId));
-  if (!order) {
+  if (!order || (order.userId !== req.user!.userId && req.user!.role !== "admin")) {
     res.status(404).json({ error: "Order not found" });
     return;
   }
@@ -107,7 +107,7 @@ router.post("/payments/paystack/verify", requireAuth, async (req, res): Promise<
   }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.paymentReference, parsed.data.reference));
-  if (!order) {
+  if (!order || (order.userId !== req.user!.userId && req.user!.role !== "admin")) {
     res.status(404).json({ error: "Order not found for this reference" });
     return;
   }
@@ -161,7 +161,7 @@ router.post("/payments/flutterwave/verify", requireAuth, async (req, res): Promi
   }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.paymentReference, parsed.data.reference));
-  if (!order) {
+  if (!order || (order.userId !== req.user!.userId && req.user!.role !== "admin")) {
     res.status(404).json({ error: "Order not found for this reference" });
     return;
   }

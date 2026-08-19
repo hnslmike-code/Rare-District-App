@@ -37,6 +37,7 @@ export function DashboardLayout({
     { href: "/vendor-dashboard", label: "Overview", icon: LayoutDashboard },
     { href: "/vendor-dashboard/products", label: "Products", icon: Package },
     { href: "/vendor-dashboard/orders", label: "Orders", icon: ShoppingCart },
+    { href: "/vendor-dashboard/settings", label: "Profile & Settings", icon: Settings },
   ];
 
   const adminLinks = [

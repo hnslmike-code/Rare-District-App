@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, productsTable, vendorsTable, adminSettingsTable } from "@workspace/db";
 import { CreateOrderBody, GetOrderParams, UpdateOrderStatusParams, UpdateOrderStatusBody, ListOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
@@ -154,8 +154,45 @@ router.patch("/orders/:id/status", requireAuth, async (req, res): Promise<void> 
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [order] = await db.update(ordersTable).set({ status: parsed.data.status }).where(eq(ordersTable.id, paramsParsed.data.id)).returning();
-  res.json(await formatOrder(order));
+  const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, paramsParsed.data.id));
+  if (!order) {
+    res.status(404).json({ error: "Order not found" });
+    return;
+  }
+
+  const isAdmin = req.user!.role === "admin";
+  const [vendor] = req.user!.role === "vendor"
+    ? await db.select().from(vendorsTable).where(and(eq(vendorsTable.userId, req.user!.userId), eq(vendorsTable.status, "approved")))
+    : [];
+  const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
+  const ownsOrderItem = Boolean(vendor && items.some(item => item.vendorId === vendor.id));
+  const isCustomer = order.userId === req.user!.userId;
+
+  if (!isAdmin && !ownsOrderItem && !(isCustomer && parsed.data.status === "cancelled")) {
+    res.status(403).json({ error: "You do not have permission to update this order." });
+    return;
+  }
+
+  const current = order.status;
+  const allowedTransitions: Record<string, string[]> = {
+    pending: ["paid", "cancelled"],
+    paid: ["processing", "cancelled"],
+    processing: ["shipped", "cancelled"],
+    shipped: ["delivered"],
+    delivered: [],
+    cancelled: [],
+  };
+  if (!isAdmin && parsed.data.status === "delivered") {
+    res.status(403).json({ error: "Vendors cannot set that order status." });
+    return;
+  }
+  if (!allowedTransitions[current]?.includes(parsed.data.status)) {
+    res.status(409).json({ error: `Cannot move an order from ${current} to ${parsed.data.status}.` });
+    return;
+  }
+
+  const [updated] = await db.update(ordersTable).set({ status: parsed.data.status }).where(eq(ordersTable.id, order.id)).returning();
+  res.json(await formatOrder(updated));
 });
 
 export default router;

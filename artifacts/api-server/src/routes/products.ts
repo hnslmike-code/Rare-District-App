@@ -28,9 +28,9 @@ async function buildProductResponse(p: typeof productsTable.$inferSelect, vendor
       description: vendor.description, logoUrl: vendor.logoUrl, website: vendor.website,
       bankName: null, accountNumber: null, accountName: null,
       status: vendor.status, commissionRateOverride: null,
-      payoutBalance: parseFloat(vendor.payoutBalance ?? "0"),
+      payoutBalance: null,
       adminNote: null, createdAt: vendor.createdAt,
-      user: user ? { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl, role: user.role, referralCode: user.referralCode, referredBy: user.referredBy, createdAt: user.createdAt } : undefined,
+      user: user ? { id: user.id, name: user.name, avatarUrl: user.avatarUrl } : undefined,
     } : undefined,
   };
 }
@@ -50,7 +50,16 @@ router.get("/products", optionalAuth, async (req, res): Promise<void> => {
     sortBy?: "newest" | "price_asc" | "price_desc" | "popular";
   } = parsed.success ? parsed.data : {};
 
-  let conditions = [eq(productsTable.isActive, true)];
+  let vendorOwnsCatalog = false;
+  if (req.user && q.vendorId) {
+    const [owner] = await db.select({ id: vendorsTable.id }).from(vendorsTable).where(and(
+      eq(vendorsTable.id, q.vendorId),
+      eq(vendorsTable.userId, req.user.userId),
+      eq(vendorsTable.status, "approved"),
+    ));
+    vendorOwnsCatalog = Boolean(owner);
+  }
+  let conditions = vendorOwnsCatalog ? [] : [eq(productsTable.isActive, true)];
   if (q.category) conditions.push(eq(productsTable.category, q.category));
   if (q.vendorId) conditions.push(eq(productsTable.vendorId, q.vendorId));
   if (q.minPrice) conditions.push(gte(productsTable.price, String(q.minPrice)));
@@ -177,7 +186,10 @@ router.patch("/products/:id", requireAuth, async (req, res): Promise<void> => {
 
   // Check ownership (vendor or admin)
   if (req.user!.role !== "admin") {
-    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, req.user!.userId));
+    const [vendor] = await db.select().from(vendorsTable).where(and(
+      eq(vendorsTable.userId, req.user!.userId),
+      eq(vendorsTable.status, "approved"),
+    ));
     if (!vendor || vendor.id !== product.vendorId) {
       res.status(403).json({ error: "Forbidden" });
       return;
@@ -192,8 +204,10 @@ router.patch("/products/:id", requireAuth, async (req, res): Promise<void> => {
   if (parsed.data.sizes != null) updates.sizes = parsed.data.sizes;
   if (parsed.data.images != null) updates.images = parsed.data.images;
   if (parsed.data.stock != null) updates.stock = parsed.data.stock;
-  if (parsed.data.isActive != null) updates.isActive = parsed.data.isActive;
-  if (parsed.data.isFeatured != null) updates.isFeatured = parsed.data.isFeatured;
+  if (req.user!.role === "admin") {
+    if (parsed.data.isActive != null) updates.isActive = parsed.data.isActive;
+    if (parsed.data.isFeatured != null) updates.isFeatured = parsed.data.isFeatured;
+  }
 
   const [updated] = await db.update(productsTable).set(updates).where(eq(productsTable.id, paramsParsed.data.id)).returning();
   res.json(await buildProductResponse(updated));
@@ -214,7 +228,10 @@ router.delete("/products/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
   if (req.user!.role !== "admin") {
-    const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, req.user!.userId));
+    const [vendor] = await db.select().from(vendorsTable).where(and(
+      eq(vendorsTable.userId, req.user!.userId),
+      eq(vendorsTable.status, "approved"),
+    ));
     if (!vendor || vendor.id !== product.vendorId) {
       res.status(403).json({ error: "Forbidden" });
       return;
