@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
-import { Search, ShoppingBag, User as UserIcon, Menu, X, ArrowRight } from "lucide-react";
-import { useGetWardrobe } from "@workspace/api-client-react";
+import { Search, User as UserIcon, Menu, X, ArrowRight } from "lucide-react";
 import { CursorGlow } from "@/components/visuals/CursorGlow";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { DistrictSidebar } from "@/components/layout/DistrictSidebar";
@@ -24,16 +23,6 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
-
-  const { data: wardrobe } = useGetWardrobe({
-    query: {
-      enabled: isAuthenticated,
-      queryKey: ["wardrobe"],
-    },
-  });
-
-  // API returns WardrobeItem[] directly
-  const wardrobeCount = Array.isArray(wardrobe) ? wardrobe.length : 0;
 
   // Close menus on route change
   useEffect(() => {
@@ -136,84 +125,37 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
 
           {/* Right: actions */}
           <div className="flex items-center gap-4 md:gap-5">
-            {/* Search */}
-             <button
-              className="text-foreground hover:text-primary transition-colors"
-               aria-label="Search"
-               data-testid="button-open-search"
-              onClick={() => setSearchOpen(true)}
-            >
-              <Search className="w-5 h-5" strokeWidth={1.5} />
-            </button>
-
             {isAuthenticated ? (
-              <>
-                {/* Wardrobe */}
-                <Link
-                  href="/wardrobe"
-                  className="relative text-foreground hover:text-primary transition-colors"
-                   aria-label="Wardrobe"
-                   data-testid="link-wardrobe"
+              <div className="relative" ref={userMenuRef}>
+                <button
+                  className="text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
+                  onClick={() => setUserMenuOpen((v) => !v)}
+                  aria-label="Account"
+                  aria-expanded={userMenuOpen}
                 >
-                  <ShoppingBag className="w-5 h-5" strokeWidth={1.5} />
-                  {wardrobeCount > 0 && (
-                    <span className="absolute -top-2 -right-2 w-4 h-4 flex items-center justify-center bg-primary text-primary-foreground text-[10px] font-bold rounded-full">
-                      {wardrobeCount}
-                    </span>
-                  )}
-                </Link>
+                  <UserIcon className="w-5 h-5" strokeWidth={1.5} />
+                </button>
 
-                {/* User menu */}
-                <div className="relative" ref={userMenuRef}>
-                  <button
-                    className="text-foreground hover:text-primary transition-colors flex items-center gap-1.5"
-                    onClick={() => setUserMenuOpen((v) => !v)}
-                    aria-label="Account"
-                    aria-expanded={userMenuOpen}
-                  >
-                    <UserIcon className="w-5 h-5" strokeWidth={1.5} />
-                  </button>
-
-                  {userMenuOpen && (
-                     <div className="absolute right-0 top-full mt-3 w-52 glass-panel z-50 animate-in fade-in slide-in-from-top-2 duration-150">
-                      <div className="px-4 py-3 border-b border-border">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Signed in as</p>
-                        <p className="text-sm font-medium truncate">{currentUser?.name || currentUser?.email}</p>
-                        <p className="text-xs text-muted-foreground capitalize tracking-widest">{currentUser?.role}</p>
-                      </div>
-                      <div className="py-1">
-                        <Link href="/orders" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors">
-                          My Orders
-                        </Link>
-                        <Link href="/rewards" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors">
-                          My Rewards
-                        </Link>
-                        <Link href="/wardrobe" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors">
-                          My Wardrobe
-                        </Link>
-                        {currentUser?.role === "vendor" && (
-                          <Link href="/vendor-dashboard" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors border-t border-border mt-1 pt-2.5">
-                            Vendor Dashboard
-                          </Link>
-                        )}
-                        {currentUser?.role === "admin" && (
-                          <Link href="/admin" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors text-primary font-medium border-t border-border mt-1 pt-2.5">
-                            Admin Panel
-                          </Link>
-                        )}
-                      </div>
-                      <div className="border-t border-border py-1">
-                        <button
-                          onClick={() => { logout(); setLocation("/"); setUserMenuOpen(false); }}
-                          className="w-full text-left px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors"
-                        >
-                          Sign Out
-                        </button>
-                      </div>
+                {userMenuOpen && (
+                  <div className="absolute right-0 top-full mt-3 w-52 glass-panel z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-4 py-3 border-b border-border">
+                      <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-0.5">Signed in as</p>
+                      <p className="text-sm font-medium truncate">{currentUser?.name || currentUser?.email}</p>
+                      <p className="text-xs text-muted-foreground capitalize tracking-widest">{currentUser?.role}</p>
                     </div>
-                  )}
-                </div>
-              </>
+                    <div className="py-1">
+                      <Link href="/orders" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors">My Orders</Link>
+                      <Link href="/rewards" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors">My Rewards</Link>
+                      <Link href="/wardrobe" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors">My Wardrobe</Link>
+                      {currentUser?.role === "vendor" && <Link href="/vendor-dashboard" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors border-t border-border mt-1 pt-2.5">Vendor Dashboard</Link>}
+                      {currentUser?.role === "admin" && <Link href="/admin" className="block px-4 py-2.5 text-sm hover:bg-secondary transition-colors text-primary font-medium border-t border-border mt-1 pt-2.5">Admin Panel</Link>}
+                    </div>
+                    <div className="border-t border-border py-1">
+                      <button onClick={() => { logout(); setLocation("/"); setUserMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm text-destructive hover:bg-destructive/10 transition-colors">Sign Out</button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
               <Link
                 href="/login"
@@ -222,6 +164,16 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
                 Sign In
               </Link>
             )}
+
+            {/* Search occupies the former wardrobe/bag action slot. */}
+            <button
+              className="rd-header-search text-foreground hover:text-primary transition-colors"
+               aria-label="Search"
+               data-testid="button-open-search"
+              onClick={() => setSearchOpen(true)}
+            >
+              <Search className="w-5 h-5" strokeWidth={1.5} />
+            </button>
           </div>
         </div>
       </header>
