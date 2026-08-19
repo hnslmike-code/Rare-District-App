@@ -8,6 +8,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
 import { optionalAuth } from "../middlewares/auth";
+import { formatPublicVendor } from "../lib/public-responses";
 
 const router: IRouter = Router();
 
@@ -23,15 +24,7 @@ async function buildProductResponse(p: typeof productsTable.$inferSelect, vendor
     isFeatured: p.isFeatured, wardrobeCount: p.wardrobeCount,
     averageRating: avgRating ? Math.round(avgRating * 10) / 10 : null,
     reviewCount: reviewRows.length, createdAt: p.createdAt,
-    vendor: vendor ? {
-      id: vendor.id, userId: vendor.userId, brandName: vendor.brandName,
-      description: vendor.description, logoUrl: vendor.logoUrl, website: vendor.website,
-      bankName: null, accountNumber: null, accountName: null,
-      status: vendor.status, commissionRateOverride: null,
-      payoutBalance: null,
-      adminNote: null, createdAt: vendor.createdAt,
-      user: user ? { id: user.id, name: user.name, avatarUrl: user.avatarUrl } : undefined,
-    } : undefined,
+    vendor: vendor ? formatPublicVendor(vendor) : undefined,
   };
 }
 

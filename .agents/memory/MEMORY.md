@@ -1,1 +1,2 @@
 - [API Zod code generation](api-zod-codegen.md) — generated Zod 4 schemas need the workspace’s `zod/v4` import path after regeneration.
+- [API security test runner](api-security-test-runner.md) — policy tests import TypeScript source with Node type stripping, not the bundled API output.

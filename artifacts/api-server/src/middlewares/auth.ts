@@ -2,6 +2,7 @@ import { type Request, type Response, type NextFunction } from "express";
 import { eq } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { verifyToken, type JwtPayload } from "../lib/auth";
+import { hasActiveAccount } from "../lib/security-boundaries";
 
 declare global {
   namespace Express {
@@ -25,7 +26,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       res.status(401).json({ error: "Account no longer exists" });
       return;
     }
-    if (user.isSuspended) {
+    if (!hasActiveAccount(user.isSuspended)) {
       res.status(403).json({ error: "This account is currently suspended. Contact Rare District support for help." });
       return;
     }
@@ -56,7 +57,7 @@ export async function optionalAuth(req: Request, _res: Response, next: NextFunct
     try {
       const tokenUser = verifyToken(authHeader.slice(7));
       const [user] = await db.select().from(usersTable).where(eq(usersTable.id, tokenUser.userId));
-      if (user && !user.isSuspended) req.user = { ...tokenUser, role: user.role };
+      if (user && hasActiveAccount(user.isSuspended)) req.user = { ...tokenUser, role: user.role };
     } catch {
       // ignore invalid token — user is just unauthenticated
     }

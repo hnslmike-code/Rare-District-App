@@ -3,6 +3,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, transactionsTable, vendorsTable } from "@workspace/db";
 import { InitiatePaystackPaymentBody, InitiateFlutterwavePaymentBody, VerifyPaystackPaymentBody, VerifyFlutterwavePaymentBody } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
+import { canAccessCustomerOrder } from "../lib/security-boundaries";
 
 const router: IRouter = Router();
 
@@ -52,7 +53,7 @@ router.post("/payments/paystack/initiate", requireAuth, async (req, res): Promis
   }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, parsed.data.orderId));
-  if (!order || (order.userId !== req.user!.userId && req.user!.role !== "admin")) {
+  if (!canAccessCustomerOrder(order, req.user!)) {
     res.status(404).json({ error: "Order not found" });
     return;
   }
@@ -94,7 +95,7 @@ router.post("/payments/flutterwave/initiate", requireAuth, async (req, res): Pro
   }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, parsed.data.orderId));
-  if (!order || (order.userId !== req.user!.userId && req.user!.role !== "admin")) {
+  if (!canAccessCustomerOrder(order, req.user!)) {
     res.status(404).json({ error: "Order not found" });
     return;
   }
@@ -141,7 +142,7 @@ router.post("/payments/paystack/verify", requireAuth, async (req, res): Promise<
   }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.paymentReference, parsed.data.reference));
-  if (!order || (order.userId !== req.user!.userId && req.user!.role !== "admin")) {
+  if (!canAccessCustomerOrder(order, req.user!)) {
     res.status(404).json({ error: "Order not found for this reference" });
     return;
   }
@@ -175,7 +176,7 @@ router.post("/payments/flutterwave/verify", requireAuth, async (req, res): Promi
   }
 
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.paymentReference, parsed.data.reference));
-  if (!order || (order.userId !== req.user!.userId && req.user!.role !== "admin")) {
+  if (!canAccessCustomerOrder(order, req.user!)) {
     res.status(404).json({ error: "Order not found for this reference" });
     return;
   }

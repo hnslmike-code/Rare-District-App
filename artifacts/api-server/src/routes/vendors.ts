@@ -5,6 +5,8 @@ import { ApplyAsVendorBody, UpdateMyVendorProfileBody, GetVendorParams, GetVendo
 import { requireAuth } from "../middlewares/auth";
 import { defaultVendorJoinPageContent, normalizeVendorJoinPageContent } from "../lib/vendor-join-content";
 import { ObjectStorageService } from "../lib/objectStorage";
+import { formatPublicVendor } from "../lib/public-responses";
+import { hasApprovedVendorAccess } from "../lib/security-boundaries";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -35,26 +37,9 @@ function formatVendor(v: typeof vendorsTable.$inferSelect, user?: typeof usersTa
   };
 }
 
-function formatPublicVendor(v: typeof vendorsTable.$inferSelect) {
-  return {
-    id: v.id,
-    brandName: v.brandName,
-    description: v.description,
-    category: v.category,
-    logoUrl: v.logoUrl,
-    website: v.website,
-    socialLink: v.socialLink,
-    status: v.status,
-    createdAt: v.createdAt,
-  };
-}
-
 async function getApprovedVendor(userId: number) {
-  const [vendor] = await db.select().from(vendorsTable).where(and(
-    eq(vendorsTable.userId, userId),
-    eq(vendorsTable.status, "approved"),
-  ));
-  return vendor;
+  const [vendor] = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, userId));
+  return vendor && hasApprovedVendorAccess(vendor.status) ? vendor : undefined;
 }
 
 async function getPublishedVendorJoinRules() {

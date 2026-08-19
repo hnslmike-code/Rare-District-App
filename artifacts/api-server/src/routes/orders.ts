@@ -3,6 +3,16 @@ import { eq, desc, and, gte, sql } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, productsTable, vendorsTable, adminSettingsTable } from "@workspace/db";
 import { CreateOrderBody, GetOrderParams, UpdateOrderStatusParams, UpdateOrderStatusBody, ListOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
+import {
+  canAccessCustomerOrder,
+  canRequestOrderStatusUpdate,
+  canSetOrderStatus,
+  hasApprovedVendorAccess,
+  isMixedVendorOrder,
+  isAllowedOrderTransition,
+  type OrderStatus,
+  vendorItemsForOrder,
+} from "../lib/security-boundaries";
 
 const router: IRouter = Router();
 
@@ -120,7 +130,7 @@ router.get("/orders/:id", requireAuth, async (req, res): Promise<void> => {
     return;
   }
   const [order] = await db.select().from(ordersTable).where(eq(ordersTable.id, parsed.data.id));
-  if (!order || (order.userId !== req.user!.userId && req.user!.role !== "admin")) {
+  if (!canAccessCustomerOrder(order, req.user!)) {
     res.status(404).json({ error: "Order not found" });
     return;
   }
@@ -147,33 +157,33 @@ router.patch("/orders/:id/status", requireAuth, async (req, res): Promise<void> 
     return;
   }
 
-  const isAdmin = req.user!.role === "admin";
   const [vendor] = req.user!.role === "vendor"
-    ? await db.select().from(vendorsTable).where(and(eq(vendorsTable.userId, req.user!.userId), eq(vendorsTable.status, "approved")))
+    ? await db.select().from(vendorsTable).where(eq(vendorsTable.userId, req.user!.userId))
     : [];
   const items = await db.select().from(orderItemsTable).where(eq(orderItemsTable.orderId, order.id));
-  const ownsOrderItem = Boolean(vendor && items.some(item => item.vendorId === vendor.id));
-  const isCustomer = order.userId === req.user!.userId;
+  const ownsOrderItem = Boolean(
+    vendor &&
+    hasApprovedVendorAccess(vendor.status) &&
+    vendorItemsForOrder(items, vendor.id).length > 0,
+  );
 
-  if (!isAdmin && !ownsOrderItem && !(isCustomer && parsed.data.status === "cancelled")) {
+  if (!canRequestOrderStatusUpdate({
+    actor: req.user!,
+    vendorOwnsOrderItem: ownsOrderItem,
+    mixedVendorOrder: isMixedVendorOrder(items),
+    order,
+    nextStatus: parsed.data.status,
+  })) {
     res.status(403).json({ error: "You do not have permission to update this order." });
     return;
   }
 
-  const current = order.status;
-  const allowedTransitions: Record<string, string[]> = {
-    pending: ["paid", "cancelled"],
-    paid: ["processing", "cancelled"],
-    processing: ["shipped", "cancelled"],
-    shipped: ["delivered"],
-    delivered: [],
-    cancelled: [],
-  };
-  if (!isAdmin && parsed.data.status === "delivered") {
+  const current = order.status as OrderStatus;
+  if (!canSetOrderStatus(req.user!, parsed.data.status)) {
     res.status(403).json({ error: "Vendors cannot set that order status." });
     return;
   }
-  if (!allowedTransitions[current]?.includes(parsed.data.status)) {
+  if (!isAllowedOrderTransition(current, parsed.data.status)) {
     res.status(409).json({ error: `Cannot move an order from ${current} to ${parsed.data.status}.` });
     return;
   }
