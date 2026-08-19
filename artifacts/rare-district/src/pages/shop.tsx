@@ -141,7 +141,7 @@ export default function Shop() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 md:gap-12">
             {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
               <div key={i} className="space-y-4">
-                <Skeleton className="aspect-[3/4] w-full bg-secondary/50 rounded-none" />
+                <Skeleton className="aspect-[3/4] w-full rounded-2xl bg-secondary/50" />
                 <Skeleton className="h-4 w-1/3 bg-secondary/50 rounded-none" />
                 <Skeleton className="h-6 w-2/3 bg-secondary/50 rounded-none" />
                 <Skeleton className="h-4 w-1/4 bg-secondary/50 rounded-none" />

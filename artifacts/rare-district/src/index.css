@@ -173,14 +173,16 @@ button.bg-primary, a.bg-primary { box-shadow: 0 8px 24px hsl(var(--primary) / .1
 .home-page { overflow: hidden; }
 .showroom-page, .product-page { background: hsl(var(--background)); }
 .showroom-heading { padding-top: 4rem; }
-.showroom-heading h1 { margin-top: .9rem; font-family: var(--app-font-serif); font-size: clamp(3.5rem, 8vw, 7rem); font-weight: 500; letter-spacing: -.07em; line-height: .95; }
+.showroom-heading h1 { margin-top: .9rem; font-family: 'Press Start 2P', 'Space Grotesk', sans-serif; font-size: clamp(1.65rem, 4.8vw, 4.4rem); font-weight: 400; letter-spacing: -.045em; line-height: 1.25; text-transform: uppercase; }
 .category-tab { position: relative; padding-bottom: .55rem; color: hsl(var(--muted-foreground)); }
 .category-tab::after { content: ""; position: absolute; right: 0; bottom: 0; left: 0; height: 1px; background: transparent; transform: scaleX(0); transform-origin: left; transition: transform .3s ease, background .3s ease; }
 .category-tab:hover, .category-tab.is-active { color: hsl(var(--foreground)); }
 .category-tab.is-active::after { background: hsl(var(--foreground)); transform: scaleX(1); }
-.showroom-grid > a { min-width: 0; }
-.showroom-product-image { background: #f2f0eb; transition: box-shadow .4s ease, transform .4s ease; }
-.showroom-grid > a:hover .showroom-product-image { box-shadow: 0 18px 34px rgba(0,0,0,.12); transform: translateY(-4px); }
+.showroom-grid > a { min-width: 0; border-radius: 1.35rem; }
+.showroom-product-image { border: 1px solid rgba(18,20,22,.08); border-radius: 1.35rem; background: #f2f0eb; box-shadow: 0 22px 48px -30px rgba(18,20,22,.55); transition: box-shadow .45s cubic-bezier(.16,1,.3,1), transform .45s cubic-bezier(.16,1,.3,1); }
+.showroom-grid > a:hover .showroom-product-image { box-shadow: 0 28px 48px -24px rgba(18,20,22,.32); transform: translateY(-5px); }
+.showroom-grid > a .eyebrow { font-family: 'Press Start 2P', 'Space Grotesk', sans-serif; font-size: .5rem; letter-spacing: .08em; line-height: 1.7; }
+.showroom-grid > a h3 { font-family: 'Space Grotesk', var(--app-font-sans); letter-spacing: -.035em; }
 .product-page .detail-image { min-height: 34rem; background: #f2f0eb; box-shadow: 0 25px 60px rgba(0,0,0,.08); }
 .product-page h1 { font-size: clamp(2.7rem, 5vw, 5.5rem); font-weight: 500; letter-spacing: -.065em; line-height: .95; }
 .product-page .prose { font-size: 1rem; }
