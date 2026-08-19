@@ -2,6 +2,7 @@ import { db, usersTable, vendorsTable, productsTable, categoriesTable, adminSett
 import { eq, sql } from "drizzle-orm";
 import { hashPassword, generateReferralCode } from "./auth";
 import { logger } from "./logger";
+import { ANIKA_STREETWEAR, ZARA_STREETWEAR, buildStreetwearProducts } from "./streetwear";
 
 // TEST-ONLY credential. Change every seeded password before a real launch.
 const TEST_PASSWORD = "RareDistrict2026!";
@@ -81,17 +82,14 @@ async function ensureTestAccounts() {
       [vendor] = await db.update(vendorsTable).set({ status: "approved" }).where(eq(vendorsTable.id, vendor.id)).returning();
     }
 
-    const [{ count }] = await db.select({ count: sql<number>`count(*)` }).from(productsTable).where(eq(productsTable.vendorId, vendor.id));
-    if (Number(count) < 2) {
-      const existingProducts = await db.select({ name: productsTable.name }).from(productsTable).where(eq(productsTable.vendorId, vendor.id));
-      const existingNames = new Set(existingProducts.map((product) => product.name));
-      const missingProducts = VENDOR_PRODUCTS[index]
-        .filter((product) => !existingNames.has(product.name))
-        .slice(0, 3 - Number(count))
-        .map((product) => ({ ...product, vendorId: vendor.id, images: [] as string[] }));
-      if (missingProducts.length > 0) {
-        await db.insert(productsTable).values(missingProducts);
-      }
+    const streetwear = buildStreetwearProducts(index === 0 ? ANIKA_STREETWEAR : ZARA_STREETWEAR);
+    const existingProducts = await db.select({ name: productsTable.name }).from(productsTable).where(eq(productsTable.vendorId, vendor.id));
+    const existingNames = new Set(existingProducts.map((product) => product.name));
+    const missingProducts = streetwear
+      .filter((product) => !existingNames.has(product.name))
+      .map((product) => ({ ...product, vendorId: vendor.id }));
+    if (missingProducts.length > 0) {
+      await db.insert(productsTable).values(missingProducts);
     }
   }
 

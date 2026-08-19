@@ -44,7 +44,7 @@ export default function Shop() {
     }
   });
 
-  const categories = ["All", "new", "designers", "editorial", "tops", "bottoms", "dresses", "outerwear", "accessories"];
+  const categories = ["All", "streetwear", "new", "designers", "editorial", "tops", "bottoms", "dresses", "outerwear", "accessories"];
 
   return (
     <div className="showroom-page min-h-screen bg-background pb-24">
