@@ -149,9 +149,6 @@ export const applyAsVendorBodyBrandNameMin = 2;
 
 export const applyAsVendorBodyContactNameMin = 2;
 
-export const applyAsVendorBodySampleImagesMin = 3;
-export const applyAsVendorBodySampleImagesMax = 5;
-
 
 
 export const ApplyAsVendorBody = zod.object({
@@ -161,7 +158,7 @@ export const ApplyAsVendorBody = zod.object({
   "category": zod.string(),
   "experienceLevel": zod.string(),
   "socialLink": zod.url(),
-  "sampleImages": zod.array(zod.string()).min(applyAsVendorBodySampleImagesMin).max(applyAsVendorBodySampleImagesMax),
+  "sampleImages": zod.array(zod.string()),
   "description": zod.string(),
   "logoUrl": zod.string().optional(),
   "website": zod.string().optional(),
@@ -2406,5 +2403,636 @@ export const GetStorageObjectParams = zod.object({
 })
 
 export const GetStorageObjectResponse = zod.unknown()
+
+
+/**
+ * @summary Get vendor join page draft and publishing state
+ */
+export const GetAdminVendorJoinPageResponse = zod.object({
+  "id": zod.int(),
+  "draftContent": zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),
+  "publishedContent": zod.union([zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),zod.null()]).optional(),
+  "scheduledContent": zod.union([zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),zod.null()]).optional(),
+  "scheduledAt": zod.coerce.date().nullish(),
+  "publishedAt": zod.coerce.date().nullish(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Save vendor join page draft
+ */
+export const UpdateAdminVendorJoinPageBody = zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+})
+
+export const UpdateAdminVendorJoinPageResponse = zod.object({
+  "id": zod.int(),
+  "draftContent": zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),
+  "publishedContent": zod.union([zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),zod.null()]).optional(),
+  "scheduledContent": zod.union([zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),zod.null()]).optional(),
+  "scheduledAt": zod.coerce.date().nullish(),
+  "publishedAt": zod.coerce.date().nullish(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Publish or schedule vendor join page draft
+ */
+export const PublishAdminVendorJoinPageBody = zod.object({
+  "mode": zod.enum(['now', 'schedule']),
+  "scheduledAt": zod.coerce.date().optional()
+})
+
+export const PublishAdminVendorJoinPageResponse = zod.object({
+  "id": zod.int(),
+  "draftContent": zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),
+  "publishedContent": zod.union([zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),zod.null()]).optional(),
+  "scheduledContent": zod.union([zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),zod.null()]).optional(),
+  "scheduledAt": zod.coerce.date().nullish(),
+  "publishedAt": zod.coerce.date().nullish(),
+  "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get published vendor join page
+ */
+export const GetStorefrontVendorJoinPageResponse = zod.object({
+  "content": zod.object({
+  "hero": zod.object({
+  "callLabel": zod.string(),
+  "eyebrow": zod.string(),
+  "intakeLabel": zod.string(),
+  "titleLine1": zod.string(),
+  "titleLine2": zod.string(),
+  "description": zod.string(),
+  "tags": zod.array(zod.string())
+}),
+  "brief": zod.object({
+  "kicker": zod.string(),
+  "headline": zod.string(),
+  "lookingForLabel": zod.string(),
+  "lookingFor": zod.array(zod.string()),
+  "note": zod.string()
+}),
+  "form": zod.object({
+  "rules": zod.object({
+  "bioMinLength": zod.int(),
+  "minSamples": zod.int(),
+  "maxSamples": zod.int(),
+  "maxImageBytes": zod.int()
+})
+}),
+  "status": zod.object({
+  "pendingLabel": zod.string(),
+  "pendingTitle": zod.string(),
+  "pendingDescription": zod.string(),
+  "rejectedLabel": zod.string(),
+  "rejectedTitle": zod.string(),
+  "rejectedDescription": zod.string(),
+  "backLabel": zod.string(),
+  "backHref": zod.string()
+}),
+  "categoryOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "experienceOptions": zod.array(zod.object({
+  "value": zod.string(),
+  "label": zod.string()
+})),
+  "theme": zod.object({
+  "acid": zod.string(),
+  "pink": zod.string(),
+  "cyan": zod.string(),
+  "ink": zod.string(),
+  "backgroundStart": zod.string(),
+  "backgroundEnd": zod.string(),
+  "gridOpacity": zod.string()
+})
+}),
+  "publishedAt": zod.coerce.date().nullish(),
+  "source": zod.enum(['fallback', 'published', 'scheduled'])
+})
 
 

@@ -32,6 +32,7 @@ import type {
   CouponUpdate,
   CouponValidation,
   ErrorEnvelope,
+  GetStorefrontVendorJoinPage200,
   GetVendorRecentOrdersParams,
   GoogleAuthCallbackParams,
   HealthStatus,
@@ -56,6 +57,7 @@ import type {
   ProductInput,
   ProductPage,
   ProductUpdate,
+  PublishPageRequest,
   ReferralStats,
   Review,
   ReviewInput,
@@ -74,6 +76,8 @@ import type {
   Vendor,
   VendorApplication,
   VendorDashboard,
+  VendorJoinPageConfig,
+  VendorJoinPageContent,
   VendorStatusUpdate,
   VendorUpdate,
   WardrobeInput,
@@ -4392,6 +4396,302 @@ export function useGetStorageObject<TData = Awaited<ReturnType<typeof getStorage
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
   const queryOptions = getGetStorageObjectQueryOptions(objectPath,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getGetAdminVendorJoinPageUrl = () => {
+
+
+
+
+  return `/api/admin/vendor-join`
+}
+
+/**
+ * @summary Get vendor join page draft and publishing state
+ */
+export const getAdminVendorJoinPage = async ( options?: Parameters<typeof customFetch>[1]): Promise<VendorJoinPageConfig> => {
+
+  return customFetch<VendorJoinPageConfig>(getGetAdminVendorJoinPageUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetAdminVendorJoinPageQueryKey = () => {
+    return [
+    `/api/admin/vendor-join`
+    ] as const;
+    }
+
+
+export const getGetAdminVendorJoinPageQueryOptions = <TData = Awaited<ReturnType<typeof getAdminVendorJoinPage>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminVendorJoinPage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetAdminVendorJoinPageQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getAdminVendorJoinPage>>> = ({ signal }) => getAdminVendorJoinPage({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getAdminVendorJoinPage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetAdminVendorJoinPageQueryResult = NonNullable<Awaited<ReturnType<typeof getAdminVendorJoinPage>>>
+export type GetAdminVendorJoinPageQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get vendor join page draft and publishing state
+ */
+
+export function useGetAdminVendorJoinPage<TData = Awaited<ReturnType<typeof getAdminVendorJoinPage>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAdminVendorJoinPage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetAdminVendorJoinPageQueryOptions(options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getUpdateAdminVendorJoinPageUrl = () => {
+
+
+
+
+  return `/api/admin/vendor-join`
+}
+
+/**
+ * @summary Save vendor join page draft
+ */
+export const updateAdminVendorJoinPage = async (vendorJoinPageContent: VendorJoinPageContent, options?: Parameters<typeof customFetch>[1]): Promise<VendorJoinPageConfig> => {
+
+  return customFetch<VendorJoinPageConfig>(getUpdateAdminVendorJoinPageUrl(),
+  {
+    ...options,
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(vendorJoinPageContent)
+  }
+);}
+
+
+
+
+
+export const getUpdateAdminVendorJoinPageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminVendorJoinPage>>, TError,{data: BodyType<VendorJoinPageContent>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof updateAdminVendorJoinPage>>, TError,{data: BodyType<VendorJoinPageContent>}, TContext> => {
+
+const mutationKey = ['updateAdminVendorJoinPage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof updateAdminVendorJoinPage>>, {data: BodyType<VendorJoinPageContent>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  updateAdminVendorJoinPage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type UpdateAdminVendorJoinPageMutationResult = NonNullable<Awaited<ReturnType<typeof updateAdminVendorJoinPage>>>
+    export type UpdateAdminVendorJoinPageMutationBody = BodyType<VendorJoinPageContent>
+    export type UpdateAdminVendorJoinPageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Save vendor join page draft
+ */
+export const useUpdateAdminVendorJoinPage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updateAdminVendorJoinPage>>, TError,{data: BodyType<VendorJoinPageContent>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof updateAdminVendorJoinPage>>,
+        TError,
+        {data: BodyType<VendorJoinPageContent>},
+        TContext
+      > => {
+      return useMutation(getUpdateAdminVendorJoinPageMutationOptions(options));
+    }
+
+export const getPublishAdminVendorJoinPageUrl = () => {
+
+
+
+
+  return `/api/admin/vendor-join/publish`
+}
+
+/**
+ * @summary Publish or schedule vendor join page draft
+ */
+export const publishAdminVendorJoinPage = async (publishPageRequest: PublishPageRequest, options?: Parameters<typeof customFetch>[1]): Promise<VendorJoinPageConfig> => {
+
+  return customFetch<VendorJoinPageConfig>(getPublishAdminVendorJoinPageUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(publishPageRequest)
+  }
+);}
+
+
+
+
+
+export const getPublishAdminVendorJoinPageMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishAdminVendorJoinPage>>, TError,{data: BodyType<PublishPageRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof publishAdminVendorJoinPage>>, TError,{data: BodyType<PublishPageRequest>}, TContext> => {
+
+const mutationKey = ['publishAdminVendorJoinPage'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof publishAdminVendorJoinPage>>, {data: BodyType<PublishPageRequest>}> = (props) => {
+          const {data} = props ?? {};
+
+          return  publishAdminVendorJoinPage(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type PublishAdminVendorJoinPageMutationResult = NonNullable<Awaited<ReturnType<typeof publishAdminVendorJoinPage>>>
+    export type PublishAdminVendorJoinPageMutationBody = BodyType<PublishPageRequest>
+    export type PublishAdminVendorJoinPageMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Publish or schedule vendor join page draft
+ */
+export const usePublishAdminVendorJoinPage = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof publishAdminVendorJoinPage>>, TError,{data: BodyType<PublishPageRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof publishAdminVendorJoinPage>>,
+        TError,
+        {data: BodyType<PublishPageRequest>},
+        TContext
+      > => {
+      return useMutation(getPublishAdminVendorJoinPageMutationOptions(options));
+    }
+
+export const getGetStorefrontVendorJoinPageUrl = () => {
+
+
+
+
+  return `/api/storefront/vendor-join`
+}
+
+/**
+ * @summary Get published vendor join page
+ */
+export const getStorefrontVendorJoinPage = async ( options?: Parameters<typeof customFetch>[1]): Promise<GetStorefrontVendorJoinPage200> => {
+
+  return customFetch<GetStorefrontVendorJoinPage200>(getGetStorefrontVendorJoinPageUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetStorefrontVendorJoinPageQueryKey = () => {
+    return [
+    `/api/storefront/vendor-join`
+    ] as const;
+    }
+
+
+export const getGetStorefrontVendorJoinPageQueryOptions = <TData = Awaited<ReturnType<typeof getStorefrontVendorJoinPage>>, TError = ErrorType<unknown>>( options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorefrontVendorJoinPage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetStorefrontVendorJoinPageQueryKey();
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getStorefrontVendorJoinPage>>> = ({ signal }) => getStorefrontVendorJoinPage({ signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getStorefrontVendorJoinPage>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetStorefrontVendorJoinPageQueryResult = NonNullable<Awaited<ReturnType<typeof getStorefrontVendorJoinPage>>>
+export type GetStorefrontVendorJoinPageQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get published vendor join page
+ */
+
+export function useGetStorefrontVendorJoinPage<TData = Awaited<ReturnType<typeof getStorefrontVendorJoinPage>>, TError = ErrorType<unknown>>(
+  options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getStorefrontVendorJoinPage>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetStorefrontVendorJoinPageQueryOptions(options)
 
   const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
 

@@ -43,6 +43,7 @@ import AdminTransactions from '@/pages/admin/transactions';
 import AdminCoupons from '@/pages/admin/coupons';
 import AdminSettings from '@/pages/admin/settings';
 import AdminMerchandising from '@/pages/admin/merchandising';
+import AdminVendorJoin from '@/pages/admin/vendor-join';
 import AdminOperations from '@/pages/admin/operations';
 
 const queryClient = new QueryClient({
@@ -152,6 +153,7 @@ function Router() {
       <Route path="/admin/transactions" component={() => <AdminRoute component={AdminTransactions} />} />
       <Route path="/admin/coupons" component={() => <AdminRoute component={AdminCoupons} />} />
       <Route path="/admin/merchandising" component={() => <AdminRoute component={AdminMerchandising} />} />
+      <Route path="/admin/vendor-join" component={() => <AdminRoute component={AdminVendorJoin} />} />
       <Route path="/admin/operations" component={() => <AdminRoute component={AdminOperations} />} />
       <Route path="/admin/settings" component={() => <AdminRoute component={AdminSettings} />} />
       <Route path="/admin" component={() => <AdminRoute component={AdminDashboard} />} />

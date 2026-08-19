@@ -1,10 +1,13 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, sql, and } from "drizzle-orm";
-import { db, vendorsTable, usersTable, productsTable, ordersTable, orderItemsTable } from "@workspace/db";
+import { db, vendorsTable, usersTable, productsTable, ordersTable, orderItemsTable, vendorJoinPageConfigsTable } from "@workspace/db";
 import { ApplyAsVendorBody, UpdateMyVendorProfileBody, GetVendorParams, GetVendorRecentOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
+import { defaultVendorJoinPageContent, normalizeVendorJoinPageContent } from "../lib/vendor-join-content";
+import { ObjectStorageService } from "../lib/objectStorage";
 
 const router: IRouter = Router();
+const objectStorageService = new ObjectStorageService();
 
 function formatVendor(v: typeof vendorsTable.$inferSelect, user?: typeof usersTable.$inferSelect) {
   return {
@@ -32,11 +35,45 @@ function formatVendor(v: typeof vendorsTable.$inferSelect, user?: typeof usersTa
   };
 }
 
+async function getPublishedVendorJoinRules() {
+  const [config] = await db.select().from(vendorJoinPageConfigsTable).orderBy(desc(vendorJoinPageConfigsTable.id)).limit(1);
+  const scheduledIsLive = Boolean(config?.scheduledContent && config.scheduledAt && config.scheduledAt <= new Date());
+  return normalizeVendorJoinPageContent((scheduledIsLive ? config?.scheduledContent : config?.publishedContent) ?? defaultVendorJoinPageContent);
+}
+
 // POST /vendors/apply
 router.post("/vendors/apply", requireAuth, async (req, res): Promise<void> => {
   const parsed = ApplyAsVendorBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const pageContent = await getPublishedVendorJoinRules();
+  const { rules } = pageContent.form;
+  if (
+    parsed.data.description.trim().length < rules.bioMinLength ||
+    parsed.data.sampleImages.length < rules.minSamples ||
+    parsed.data.sampleImages.length > rules.maxSamples ||
+    !pageContent.categoryOptions.some(option => option.value === parsed.data.category) ||
+    !pageContent.experienceOptions.some(option => option.value === parsed.data.experienceLevel)
+  ) {
+    res.status(400).json({ error: "Your application does not meet the current vendor intake requirements." });
+    return;
+  }
+  const uploadedImagesAreValid = await Promise.all(parsed.data.sampleImages.map(async objectPath => {
+    try {
+      const file = await objectStorageService.getObjectEntityFile(objectPath);
+      const [metadata] = await file.getMetadata();
+      return typeof metadata.contentType === "string" &&
+        metadata.contentType.startsWith("image/") &&
+        Number(metadata.size) > 0 &&
+        Number(metadata.size) <= rules.maxImageBytes;
+    } catch {
+      return false;
+    }
+  }));
+  if (uploadedImagesAreValid.some(valid => !valid)) {
+    res.status(400).json({ error: "One or more uploaded samples do not meet the current image requirements." });
     return;
   }
   const existing = await db.select().from(vendorsTable).where(eq(vendorsTable.userId, req.user!.userId));

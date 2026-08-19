@@ -43,11 +43,105 @@ export type HomepageContent = {
   };
 };
 
+export type VendorJoinPageContent = {
+  hero: {
+    callLabel: string;
+    eyebrow: string;
+    intakeLabel: string;
+    titleLine1: string;
+    titleLine2: string;
+    description: string;
+    tags: string[];
+  };
+  brief: {
+    kicker: string;
+    headline: string;
+    lookingForLabel: string;
+    lookingFor: string[];
+    note: string;
+  };
+  form: {
+    eyebrow: string;
+    title: string;
+    progressLabel: string;
+    contactLegend: string;
+    contactAccent: string;
+    fullNameLabel: string;
+    fullNamePlaceholder: string;
+    emailLabel: string;
+    emailFallback: string;
+    phoneLabel: string;
+    phonePlaceholder: string;
+    brandLegend: string;
+    brandAccent: string;
+    brandNameLabel: string;
+    brandNamePlaceholder: string;
+    categoryLabel: string;
+    categoryPlaceholder: string;
+    experienceLabel: string;
+    experiencePlaceholder: string;
+    bioLabel: string;
+    bioPlaceholder: string;
+    bioHint: string;
+    proofLegend: string;
+    proofAccent: string;
+    socialLabel: string;
+    socialPlaceholder: string;
+    socialHint: string;
+    samplesLabel: string;
+    uploadTitle: string;
+    uploadHint: string;
+    uploadingLabel: string;
+    uploadedSuffix: string;
+    rules: {
+      bioMinLength: number;
+      minSamples: number;
+      maxSamples: number;
+      maxImageBytes: number;
+    };
+    submitLabel: string;
+    submittingLabel: string;
+    legal: string;
+  };
+  status: {
+    pendingLabel: string;
+    pendingTitle: string;
+    pendingDescription: string;
+    rejectedLabel: string;
+    rejectedTitle: string;
+    rejectedDescription: string;
+    backLabel: string;
+    backHref: string;
+  };
+  categoryOptions: Array<{ value: string; label: string }>;
+  experienceOptions: Array<{ value: string; label: string }>;
+  theme: {
+    acid: string;
+    pink: string;
+    cyan: string;
+    ink: string;
+    backgroundStart: string;
+    backgroundEnd: string;
+    gridOpacity: string;
+  };
+};
+
 export const homepageConfigsTable = pgTable("homepage_configs", {
   id: serial("id").primaryKey(),
   draftContent: jsonb("draft_content").$type<HomepageContent>().notNull(),
   publishedContent: jsonb("published_content").$type<HomepageContent>(),
   scheduledContent: jsonb("scheduled_content").$type<HomepageContent>(),
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  updatedBy: integer("updated_by"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+});
+
+export const vendorJoinPageConfigsTable = pgTable("vendor_join_page_configs", {
+  id: serial("id").primaryKey(),
+  draftContent: jsonb("draft_content").$type<VendorJoinPageContent>().notNull(),
+  publishedContent: jsonb("published_content").$type<VendorJoinPageContent>(),
+  scheduledContent: jsonb("scheduled_content").$type<VendorJoinPageContent>(),
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   updatedBy: integer("updated_by"),
@@ -68,3 +162,4 @@ export const insertAdminSettingsSchema = createInsertSchema(adminSettingsTable).
 export type InsertAdminSettings = z.infer<typeof insertAdminSettingsSchema>;
 export type AdminSettings = typeof adminSettingsTable.$inferSelect;
 export type HomepageConfig = typeof homepageConfigsTable.$inferSelect;
+export type VendorJoinPageConfig = typeof vendorJoinPageConfigsTable.$inferSelect;

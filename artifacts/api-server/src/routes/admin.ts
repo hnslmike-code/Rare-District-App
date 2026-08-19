@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { and, eq, desc, sql, asc, gt, inArray } from "drizzle-orm";
-import { db, usersTable, vendorsTable, productsTable, ordersTable, transactionsTable, adminSettingsTable, payoutRecordsTable, homepageConfigsTable, adminAuditLogsTable, categoriesTable, type HomepageContent } from "@workspace/db";
+import { db, usersTable, vendorsTable, productsTable, ordersTable, transactionsTable, adminSettingsTable, payoutRecordsTable, homepageConfigsTable, vendorJoinPageConfigsTable, adminAuditLogsTable, categoriesTable, type HomepageContent, type VendorJoinPageContent } from "@workspace/db";
 import {
   UpdateVendorStatusParams, UpdateVendorStatusBody,
   ListAdminVendorsQueryParams, ListAdminProductsQueryParams, ListAdminOrdersQueryParams,
@@ -8,6 +8,7 @@ import {
   UpdateAdminSettingsBody,
 } from "@workspace/api-zod";
 import { requireAuth, requireRole } from "../middlewares/auth";
+import { defaultVendorJoinPageContent, normalizeVendorJoinPageContent } from "../lib/vendor-join-content";
 
 const router: IRouter = Router();
 
@@ -67,6 +68,72 @@ async function getHomepageConfig() {
   const [existing] = await db.select().from(homepageConfigsTable).orderBy(asc(homepageConfigsTable.id)).limit(1);
   if (existing) return existing;
   const [created] = await db.insert(homepageConfigsTable).values({ draftContent: defaultHomepageContent }).returning();
+  return created;
+}
+
+function isHexColor(value: unknown) {
+  return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value);
+}
+
+function isOptionList(value: unknown, max: number) {
+  return Array.isArray(value) && value.length > 0 && value.length <= max &&
+    value.every(option => option && typeof option === "object" && isShortText((option as { value?: unknown }).value, 80) && isShortText((option as { label?: unknown }).label, 100));
+}
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isVendorJoinPageContent(value: unknown): value is VendorJoinPageContent {
+  if (!isObjectRecord(value) || !isObjectRecord(value.hero) || !isObjectRecord(value.brief) || !isObjectRecord(value.form) || !isObjectRecord(value.status) || !isObjectRecord(value.theme)) return false;
+  const content = value as unknown as VendorJoinPageContent;
+  const textFields = [
+    content.hero?.callLabel, content.hero?.eyebrow, content.hero?.intakeLabel, content.hero?.titleLine1, content.hero?.titleLine2, content.hero?.description,
+    content.brief?.kicker, content.brief?.headline, content.brief?.lookingForLabel, content.brief?.note,
+    content.form?.eyebrow, content.form?.title, content.form?.progressLabel, content.form?.contactLegend, content.form?.contactAccent,
+    content.form?.fullNameLabel, content.form?.fullNamePlaceholder, content.form?.emailLabel, content.form?.emailFallback,
+    content.form?.phoneLabel, content.form?.phonePlaceholder, content.form?.brandLegend, content.form?.brandAccent,
+    content.form?.brandNameLabel, content.form?.brandNamePlaceholder, content.form?.categoryLabel, content.form?.categoryPlaceholder,
+    content.form?.experienceLabel, content.form?.experiencePlaceholder, content.form?.bioLabel, content.form?.bioPlaceholder,
+    content.form?.bioHint, content.form?.proofLegend, content.form?.proofAccent, content.form?.socialLabel,
+    content.form?.socialPlaceholder, content.form?.socialHint, content.form?.samplesLabel, content.form?.uploadTitle,
+    content.form?.uploadHint, content.form?.uploadingLabel, content.form?.uploadedSuffix, content.form?.submitLabel, content.form?.submittingLabel, content.form?.legal,
+    content.status?.pendingLabel, content.status?.pendingTitle, content.status?.pendingDescription,
+    content.status?.rejectedLabel, content.status?.rejectedTitle, content.status?.rejectedDescription,
+    content.status?.backLabel, content.status?.backHref,
+  ];
+  return Boolean(
+    textFields.every(field => isShortText(field, 500)) &&
+    Array.isArray(content.hero.tags) && content.hero.tags.length > 0 && content.hero.tags.length <= 6 && content.hero.tags.every(tag => isShortText(tag, 100)) &&
+    Array.isArray(content.brief.lookingFor) && content.brief.lookingFor.length > 0 && content.brief.lookingFor.length <= 6 && content.brief.lookingFor.every(item => isShortText(item, 160)) &&
+    typeof content.status.backHref === "string" && content.status.backHref.startsWith("/") &&
+    Number.isInteger(content.form.rules?.bioMinLength) && content.form.rules.bioMinLength >= 20 && content.form.rules.bioMinLength <= 1000 &&
+    Number.isInteger(content.form.rules?.minSamples) && Number.isInteger(content.form.rules?.maxSamples) &&
+    content.form.rules.minSamples >= 1 && content.form.rules.maxSamples >= content.form.rules.minSamples && content.form.rules.maxSamples <= 10 &&
+    Number.isInteger(content.form.rules?.maxImageBytes) && content.form.rules.maxImageBytes >= 100_000 && content.form.rules.maxImageBytes <= 10_000_000 &&
+    isOptionList(content.categoryOptions, 12) && isOptionList(content.experienceOptions, 12) &&
+    isHexColor(content.theme.acid) && isHexColor(content.theme.pink) && isHexColor(content.theme.cyan) &&
+    isHexColor(content.theme.ink) && isHexColor(content.theme.backgroundStart) && isHexColor(content.theme.backgroundEnd) &&
+    typeof content.theme.gridOpacity === "string" && /^(0(\.[0-9]+)?|1(\.0+)?)$/.test(content.theme.gridOpacity),
+  );
+}
+
+function formatVendorJoinConfig(config: typeof vendorJoinPageConfigsTable.$inferSelect) {
+  return {
+    id: config.id,
+    draftContent: normalizeVendorJoinPageContent(config.draftContent),
+    publishedContent: config.publishedContent ? normalizeVendorJoinPageContent(config.publishedContent) : null,
+    scheduledContent: config.scheduledContent ? normalizeVendorJoinPageContent(config.scheduledContent) : null,
+    scheduledAt: config.scheduledAt,
+    publishedAt: config.publishedAt,
+    updatedAt: config.updatedAt,
+  };
+}
+
+async function getVendorJoinConfig() {
+  const [existing] = await db.select().from(vendorJoinPageConfigsTable).orderBy(asc(vendorJoinPageConfigsTable.id)).limit(1);
+  if (existing) return existing;
+  const [created] = await db.insert(vendorJoinPageConfigsTable).values({ draftContent: defaultVendorJoinPageContent }).returning();
   return created;
 }
 
@@ -237,6 +304,51 @@ router.post("/admin/homepage/publish", requireAuth, requireRole("admin"), async 
     .returning();
   await recordAudit(req, isScheduled ? "scheduled_homepage_publish" : "published_homepage", "homepage", String(updated.id), scheduledAt?.toISOString());
   res.json({ id: updated.id, draftContent: updated.draftContent, publishedContent: updated.publishedContent, scheduledContent: updated.scheduledContent, scheduledAt: updated.scheduledAt, publishedAt: updated.publishedAt, updatedAt: updated.updatedAt });
+});
+
+// GET /admin/vendor-join
+router.get("/admin/vendor-join", requireAuth, requireRole("admin"), async (_req, res): Promise<void> => {
+  res.json(formatVendorJoinConfig(await getVendorJoinConfig()));
+});
+
+// PATCH /admin/vendor-join
+router.patch("/admin/vendor-join", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  if (!isVendorJoinPageContent(req.body)) {
+    res.status(400).json({ error: "Vendor join page content is incomplete or invalid." });
+    return;
+  }
+  const config = await getVendorJoinConfig();
+  const [updated] = await db.update(vendorJoinPageConfigsTable)
+    .set({ draftContent: req.body, updatedBy: req.user!.userId })
+    .where(eq(vendorJoinPageConfigsTable.id, config.id))
+    .returning();
+  await recordAudit(req, "saved_vendor_join_draft", "vendor_join_page", String(updated.id));
+  res.json(formatVendorJoinConfig(updated));
+});
+
+// POST /admin/vendor-join/publish
+router.post("/admin/vendor-join/publish", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const payload = req.body as { mode?: unknown; scheduledAt?: unknown };
+  if ((payload.mode !== "now" && payload.mode !== "schedule") || (payload.mode === "schedule" && typeof payload.scheduledAt !== "string")) {
+    res.status(400).json({ error: "Choose publish now or provide a future schedule time." });
+    return;
+  }
+  const config = await getVendorJoinConfig();
+  const content = normalizeVendorJoinPageContent(config.draftContent);
+  const isScheduled = payload.mode === "schedule";
+  const scheduledAt = isScheduled ? new Date(payload.scheduledAt as string) : null;
+  if (scheduledAt && (Number.isNaN(scheduledAt.getTime()) || scheduledAt <= new Date())) {
+    res.status(400).json({ error: "Scheduled publish time must be in the future." });
+    return;
+  }
+  const [updated] = await db.update(vendorJoinPageConfigsTable)
+    .set(isScheduled
+      ? { scheduledContent: content, scheduledAt, updatedBy: req.user!.userId }
+      : { publishedContent: content, publishedAt: new Date(), scheduledContent: null, scheduledAt: null, updatedBy: req.user!.userId })
+    .where(eq(vendorJoinPageConfigsTable.id, config.id))
+    .returning();
+  await recordAudit(req, isScheduled ? "scheduled_vendor_join_publish" : "published_vendor_join", "vendor_join_page", String(updated.id), scheduledAt?.toISOString());
+  res.json(formatVendorJoinConfig(updated));
 });
 
 // GET /admin/vendors

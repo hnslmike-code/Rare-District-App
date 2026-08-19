@@ -1265,6 +1265,77 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorEnvelope"
 
+  # ── VENDOR JOIN PAGE CMS ─────────────────────────────────────────────────
+  /admin/vendor-join:
+    get:
+      operationId: getAdminVendorJoinPage
+      tags: [Admin]
+      summary: Get vendor join page draft and publishing state
+      responses:
+        "200":
+          description: Vendor join page configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorJoinPageConfig"
+    patch:
+      operationId: updateAdminVendorJoinPage
+      tags: [Admin]
+      summary: Save vendor join page draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VendorJoinPageContent"
+      responses:
+        "200":
+          description: Updated vendor join page configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorJoinPageConfig"
+  /admin/vendor-join/publish:
+    post:
+      operationId: publishAdminVendorJoinPage
+      tags: [Admin]
+      summary: Publish or schedule vendor join page draft
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PublishPageRequest"
+      responses:
+        "200":
+          description: Updated vendor join page configuration
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VendorJoinPageConfig"
+  /storefront/vendor-join:
+    get:
+      operationId: getStorefrontVendorJoinPage
+      tags: [Storefront]
+      summary: Get published vendor join page
+      responses:
+        "200":
+          description: Published vendor join content
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [content, source]
+                properties:
+                  content:
+                    $ref: "#/components/schemas/VendorJoinPageContent"
+                  publishedAt:
+                    type: ["string", "null"]
+                    format: date-time
+                  source:
+                    type: string
+                    enum: [fallback, published, scheduled]
+
 # ── SCHEMAS ──────────────────────────────────────────────────────────────────
 components:
   schemas:
@@ -1288,6 +1359,125 @@ components:
       properties:
         success:
           type: boolean
+
+    PublishPageRequest:
+      type: object
+      required: [mode]
+      properties:
+        mode:
+          type: string
+          enum: [now, schedule]
+        scheduledAt:
+          type: string
+          format: date-time
+
+    VendorJoinOption:
+      type: object
+      required: [value, label]
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+
+    VendorJoinTheme:
+      type: object
+      required: [acid, pink, cyan, ink, backgroundStart, backgroundEnd, gridOpacity]
+      properties:
+        acid: { type: string }
+        pink: { type: string }
+        cyan: { type: string }
+        ink: { type: string }
+        backgroundStart: { type: string }
+        backgroundEnd: { type: string }
+        gridOpacity: { type: string }
+
+    VendorJoinPageContent:
+      type: object
+      required: [hero, brief, form, status, categoryOptions, experienceOptions, theme]
+      properties:
+        hero:
+          type: object
+          required: [callLabel, eyebrow, intakeLabel, titleLine1, titleLine2, description, tags]
+          properties:
+            callLabel: { type: string }
+            eyebrow: { type: string }
+            intakeLabel: { type: string }
+            titleLine1: { type: string }
+            titleLine2: { type: string }
+            description: { type: string }
+            tags: { type: array, items: { type: string } }
+        brief:
+          type: object
+          required: [kicker, headline, lookingForLabel, lookingFor, note]
+          properties:
+            kicker: { type: string }
+            headline: { type: string }
+            lookingForLabel: { type: string }
+            lookingFor: { type: array, items: { type: string } }
+            note: { type: string }
+        form:
+          type: object
+          required: [rules]
+          properties:
+            rules:
+              type: object
+              required: [bioMinLength, minSamples, maxSamples, maxImageBytes]
+              properties:
+                bioMinLength: { type: integer }
+                minSamples: { type: integer }
+                maxSamples: { type: integer }
+                maxImageBytes: { type: integer }
+          additionalProperties:
+            type: string
+        status:
+          type: object
+          required: [pendingLabel, pendingTitle, pendingDescription, rejectedLabel, rejectedTitle, rejectedDescription, backLabel, backHref]
+          properties:
+            pendingLabel: { type: string }
+            pendingTitle: { type: string }
+            pendingDescription: { type: string }
+            rejectedLabel: { type: string }
+            rejectedTitle: { type: string }
+            rejectedDescription: { type: string }
+            backLabel: { type: string }
+            backHref: { type: string }
+        categoryOptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/VendorJoinOption"
+        experienceOptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/VendorJoinOption"
+        theme:
+          $ref: "#/components/schemas/VendorJoinTheme"
+
+    VendorJoinPageConfig:
+      type: object
+      required: [id, draftContent, updatedAt]
+      properties:
+        id:
+          type: integer
+        draftContent:
+          $ref: "#/components/schemas/VendorJoinPageContent"
+        publishedContent:
+          oneOf:
+            - $ref: "#/components/schemas/VendorJoinPageContent"
+            - type: "null"
+        scheduledContent:
+          oneOf:
+            - $ref: "#/components/schemas/VendorJoinPageContent"
+            - type: "null"
+        scheduledAt:
+          type: ["string", "null"]
+          format: date-time
+        publishedAt:
+          type: ["string", "null"]
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     # ── Auth ────────────────────────────────────────────────────────────────
     User:
@@ -1431,8 +1621,6 @@ components:
           format: uri
         sampleImages:
           type: array
-          minItems: 3
-          maxItems: 5
           items:
             type: string
         description:

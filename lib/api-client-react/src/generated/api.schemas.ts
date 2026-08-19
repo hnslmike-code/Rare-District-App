@@ -17,6 +17,97 @@ export interface SuccessEnvelope {
   success: boolean;
 }
 
+export type PublishPageRequestMode = typeof PublishPageRequestMode[keyof typeof PublishPageRequestMode];
+
+
+export const PublishPageRequestMode = {
+  now: 'now',
+  schedule: 'schedule',
+} as const;
+
+export interface PublishPageRequest {
+  mode: PublishPageRequestMode;
+  scheduledAt?: string;
+}
+
+export interface VendorJoinOption {
+  value: string;
+  label: string;
+}
+
+export interface VendorJoinTheme {
+  acid: string;
+  pink: string;
+  cyan: string;
+  ink: string;
+  backgroundStart: string;
+  backgroundEnd: string;
+  gridOpacity: string;
+}
+
+export type VendorJoinPageContentHero = {
+  callLabel: string;
+  eyebrow: string;
+  intakeLabel: string;
+  titleLine1: string;
+  titleLine2: string;
+  description: string;
+  tags: string[];
+};
+
+export type VendorJoinPageContentBrief = {
+  kicker: string;
+  headline: string;
+  lookingForLabel: string;
+  lookingFor: string[];
+  note: string;
+};
+
+export type VendorJoinPageContentFormRules = {
+  bioMinLength: number;
+  minSamples: number;
+  maxSamples: number;
+  maxImageBytes: number;
+};
+
+export type VendorJoinPageContentForm = {
+  rules: VendorJoinPageContentFormRules;
+  [key: string]: unknown;
+};
+
+export type VendorJoinPageContentStatus = {
+  pendingLabel: string;
+  pendingTitle: string;
+  pendingDescription: string;
+  rejectedLabel: string;
+  rejectedTitle: string;
+  rejectedDescription: string;
+  backLabel: string;
+  backHref: string;
+};
+
+export interface VendorJoinPageContent {
+  hero: VendorJoinPageContentHero;
+  brief: VendorJoinPageContentBrief;
+  form: VendorJoinPageContentForm;
+  status: VendorJoinPageContentStatus;
+  categoryOptions: VendorJoinOption[];
+  experienceOptions: VendorJoinOption[];
+  theme: VendorJoinTheme;
+}
+
+export interface VendorJoinPageConfig {
+  id: number;
+  draftContent: VendorJoinPageContent;
+  publishedContent?: VendorJoinPageContent | null;
+  scheduledContent?: VendorJoinPageContent | null;
+  /** @nullable */
+  scheduledAt?: string | null;
+  /** @nullable */
+  publishedAt?: string | null;
+  updatedAt: string;
+}
+
 export type UserRole = typeof UserRole[keyof typeof UserRole];
 
 
@@ -128,10 +219,6 @@ export interface VendorApplication {
   category: string;
   experienceLevel: string;
   socialLink: string;
-  /**
-     * @minItems 3
-     * @maxItems 5
-     */
   sampleImages: string[];
   description: string;
   logoUrl?: string;
@@ -734,5 +821,21 @@ status?: string;
 export type ListTransactionsParams = {
 page?: number;
 limit?: number;
+};
+
+export type GetStorefrontVendorJoinPage200Source = typeof GetStorefrontVendorJoinPage200Source[keyof typeof GetStorefrontVendorJoinPage200Source];
+
+
+export const GetStorefrontVendorJoinPage200Source = {
+  fallback: 'fallback',
+  published: 'published',
+  scheduled: 'scheduled',
+} as const;
+
+export type GetStorefrontVendorJoinPage200 = {
+  content: VendorJoinPageContent;
+  /** @nullable */
+  publishedAt?: string | null;
+  source: GetStorefrontVendorJoinPage200Source;
 };
 

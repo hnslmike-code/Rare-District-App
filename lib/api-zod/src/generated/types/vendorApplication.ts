@@ -15,10 +15,6 @@ export interface VendorApplication {
   category: string;
   experienceLevel: string;
   socialLink: string;
-  /**
-     * @minItems 3
-     * @maxItems 5
-     */
   sampleImages: string[];
   description: string;
   logoUrl?: string;

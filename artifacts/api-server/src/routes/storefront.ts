@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, desc, and, sql } from "drizzle-orm";
-import { db, productsTable, vendorsTable, usersTable, categoriesTable, homepageConfigsTable, type HomepageContent } from "@workspace/db";
+import { db, productsTable, vendorsTable, usersTable, categoriesTable, homepageConfigsTable, vendorJoinPageConfigsTable, type HomepageContent } from "@workspace/db";
+import { defaultVendorJoinPageContent, normalizeVendorJoinPageContent } from "../lib/vendor-join-content";
 
 const router: IRouter = Router();
 
@@ -30,6 +31,18 @@ router.get("/storefront/homepage", async (_req, res): Promise<void> => {
   const scheduledIsLive = Boolean(config?.scheduledContent && config.scheduledAt && config.scheduledAt <= new Date());
   const content = (scheduledIsLive ? config?.scheduledContent : config?.publishedContent) ?? storefrontHomepageFallback;
   res.json({ content, publishedAt: scheduledIsLive ? config?.scheduledAt : config?.publishedAt, source: scheduledIsLive ? "scheduled" : config?.publishedContent ? "published" : "fallback" });
+});
+
+// GET /storefront/vendor-join
+router.get("/storefront/vendor-join", async (_req, res): Promise<void> => {
+  const [config] = await db.select().from(vendorJoinPageConfigsTable).orderBy(desc(vendorJoinPageConfigsTable.id)).limit(1);
+  const scheduledIsLive = Boolean(config?.scheduledContent && config.scheduledAt && config.scheduledAt <= new Date());
+  const content = normalizeVendorJoinPageContent((scheduledIsLive ? config?.scheduledContent : config?.publishedContent) ?? defaultVendorJoinPageContent);
+  res.json({
+    content,
+    publishedAt: scheduledIsLive ? config?.scheduledAt : config?.publishedAt,
+    source: scheduledIsLive ? "scheduled" : config?.publishedContent ? "published" : "fallback",
+  });
 });
 
 // GET /storefront/summary
