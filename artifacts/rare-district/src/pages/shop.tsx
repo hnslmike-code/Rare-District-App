@@ -152,7 +152,7 @@ export default function Shop() {
           <>
              <div className="showroom-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 md:gap-x-8 md:gap-y-16">
               {productsData.items.map((product) => (
-                <Link key={product.id} href={`/product/${product.id}`} className="group block">
+                 <Link key={product.id} href={`/product/${product.id}`} className="group block showroom-product-card">
                    <div className="showroom-product-image aspect-[3/4] overflow-hidden bg-secondary mb-6 relative luxury-image">
                     {product.images?.[0] ? (
                       <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-700 ease-out" />
@@ -169,7 +169,7 @@ export default function Shop() {
                   <div className="flex justify-between items-start gap-4">
                     <div>
                        <p className="eyebrow mb-2 line-clamp-1">{product.vendor?.brandName || "Rare District"}</p>
-                       <h3 className="font-serif text-lg md:text-xl font-medium mb-2 group-hover:underline transition-colors line-clamp-2">{product.name}</h3>
+                        <h3 className="showroom-product-title font-medium mb-2 group-hover:underline transition-colors line-clamp-2">{product.name}</h3>
                        <p className="font-serif text-base">{product.currency} {product.price.toLocaleString()}</p>
                     </div>
                   </div>
