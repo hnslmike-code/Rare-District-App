@@ -84,7 +84,7 @@ export const defaultVendorJoinPageContent: VendorJoinPageContent = {
   ],
   theme: {
     acid: "#dfff00",
-    pink: "#ff3cac",
+    pink: "#9a725c",
     cyan: "#3cf3ff",
     ink: "#08070d",
     backgroundStart: "#0d0917",
