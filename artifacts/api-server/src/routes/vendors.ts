@@ -8,6 +8,7 @@ import { ObjectStorageService } from "../lib/objectStorage";
 import { formatPublicVendor } from "../lib/public-responses";
 import { hasApprovedVendorAccess } from "../lib/security-boundaries";
 import { recordOrderItemLedgerEntry } from "./orders";
+import { createVendorAlert } from "../lib/vendor-notifications";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
@@ -419,20 +420,30 @@ router.post("/vendors/me/payout-request", requireAuth, async (req, res): Promise
     res.status(400).json({ error: "Payout requests must be at least ₦1,000." });
     return;
   }
-  const [debited] = await db.update(vendorsTable)
-    .set({ payoutBalance: sql`${vendorsTable.payoutBalance} - ${amount}` })
-    .where(and(eq(vendorsTable.id, vendor.id), sql`${vendorsTable.payoutBalance} >= ${amount}`))
-    .returning({ id: vendorsTable.id });
-  if (!debited) {
+  const record = await db.transaction(async tx => {
+    const [debited] = await tx.update(vendorsTable)
+      .set({ payoutBalance: sql`${vendorsTable.payoutBalance} - ${amount}` })
+      .where(and(eq(vendorsTable.id, vendor.id), sql`${vendorsTable.payoutBalance} >= ${amount}`))
+      .returning({ id: vendorsTable.id });
+    if (!debited) return undefined;
+    const [created] = await tx.insert(payoutRecordsTable).values({
+      vendorId: vendor.id,
+      amount: String(amount),
+      status: "pending",
+      note: typeof req.body?.note === "string" ? req.body.note.slice(0, 500) : null,
+    }).returning();
+    await createVendorAlert(tx, vendor, {
+      type: "payout",
+      title: "Payout request received",
+      body: `Your ₦${amount.toLocaleString()} payout request is awaiting review.`,
+      href: "/vendor-dashboard/payouts",
+    });
+    return created;
+  });
+  if (!record) {
     res.status(409).json({ error: "Requested amount is greater than your available balance." });
     return;
   }
-  const [record] = await db.insert(payoutRecordsTable).values({
-    vendorId: vendor.id,
-    amount: String(amount),
-    status: "pending",
-    note: typeof req.body?.note === "string" ? req.body.note.slice(0, 500) : null,
-  }).returning();
   res.status(201).json({
     id: record.id, amount: Number(record.amount), status: record.status,
     reference: record.reference, createdAt: record.createdAt,

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
+import { vendorJson } from "@/lib/vendor-control";
 import {
   LayoutDashboard,
   Package,
@@ -31,6 +33,13 @@ export function DashboardLayout({
   const { logout, currentUser } = useAuth();
   const [location, setLocation] = useLocation();
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const unreadNotifications = useQuery({
+    queryKey: ["/api/notifications/unread-count"],
+    queryFn: () => vendorJson<{ unreadCount: number }>("/api/notifications/unread-count"),
+    enabled: !isAdmin && currentUser?.role === "vendor",
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
 
   const handleLogout = () => {
     logout();
@@ -116,7 +125,12 @@ export function DashboardLayout({
                   data-testid={`link-dashboard-${link.label.toLowerCase().replace(/\s+/g, "-")}`}
                 >
                   <Icon className="w-4 h-4 flex-shrink-0" strokeWidth={active ? 2 : 1.5} />
-                  {link.label}
+                  <span className="flex-1">{link.label}</span>
+                  {!isAdmin && link.href === "/vendor-dashboard/notifications" && (unreadNotifications.data?.unreadCount ?? 0) > 0 && (
+                    <span className="min-w-5 rounded-full bg-primary px-1.5 py-0.5 text-center text-[10px] font-bold text-primary-foreground">
+                      {unreadNotifications.data!.unreadCount > 99 ? "99+" : unreadNotifications.data!.unreadCount}
+                    </span>
+                  )}
                 </Link>
               </div>
             );

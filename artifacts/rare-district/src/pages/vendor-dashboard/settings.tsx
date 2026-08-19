@@ -10,7 +10,7 @@ export default function VendorSettings() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [form, setForm] = useState({ brandName: "", contactName: "", phone: "", description: "", category: "", experienceLevel: "", socialLink: "", logoUrl: "", website: "" });
-  const [operations, setOperations] = useState({ shippingRegions: "", processingDays: 5, returnWindowDays: 14, returnConditions: "", cancellationPolicy: "", orderAlerts: true, lowStockAlerts: true, payoutAlerts: true });
+  const [operations, setOperations] = useState({ shippingRegions: "", processingDays: 5, returnWindowDays: 14, returnConditions: "", cancellationPolicy: "", orderAlerts: true, lowStockAlerts: true, payoutAlerts: true, whatsAppAlerts: false });
   const [opsSaving, setOpsSaving] = useState(false);
 
   useEffect(() => {
@@ -36,6 +36,7 @@ export default function VendorSettings() {
           orderAlerts: data.notificationPreferences?.orderAlerts ?? true,
           lowStockAlerts: data.notificationPreferences?.lowStockAlerts ?? true,
           payoutAlerts: data.notificationPreferences?.payoutAlerts ?? true,
+          whatsAppAlerts: data.notificationPreferences?.whatsAppAlerts ?? false,
         });
       }).catch(() => undefined);
   }, [profile]);
@@ -64,7 +65,7 @@ export default function VendorSettings() {
           returnWindowDays: operations.returnWindowDays,
           returnConditions: operations.returnConditions,
           cancellationPolicy: operations.cancellationPolicy,
-          notificationPreferences: { orderAlerts: operations.orderAlerts, lowStockAlerts: operations.lowStockAlerts, payoutAlerts: operations.payoutAlerts },
+          notificationPreferences: { orderAlerts: operations.orderAlerts, lowStockAlerts: operations.lowStockAlerts, payoutAlerts: operations.payoutAlerts, whatsAppAlerts: operations.whatsAppAlerts },
         }),
       });
       const result = await response.json();
@@ -105,7 +106,8 @@ export default function VendorSettings() {
            </div>
            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Return conditions<textarea value={operations.returnConditions} onChange={e => setOperations({ ...operations, returnConditions: e.target.value })} className={`${input} min-h-24`} placeholder="Items must be unworn with tags attached." /></label>
            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Cancellation policy<textarea value={operations.cancellationPolicy} onChange={e => setOperations({ ...operations, cancellationPolicy: e.target.value })} className={`${input} min-h-24`} placeholder="Orders can be cancelled before dispatch." /></label>
-           <div className="grid gap-3 sm:grid-cols-3">{[["orderAlerts", "New order alerts"], ["lowStockAlerts", "Low-stock alerts"], ["payoutAlerts", "Payout alerts"]].map(([key, label]) => <label key={key} className="flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={operations[key as keyof typeof operations] as boolean} onChange={e => setOperations({ ...operations, [key]: e.target.checked })} />{label}</label>)}</div>
+           <div className="grid gap-3 sm:grid-cols-2">{[["orderAlerts", "New order alerts"], ["lowStockAlerts", "Low-stock alerts"], ["payoutAlerts", "Payout alerts"], ["whatsAppAlerts", "WhatsApp alerts (awaiting provider)"]].map(([key, label]) => <label key={key} className="flex items-center gap-2 text-xs text-muted-foreground"><input type="checkbox" checked={operations[key as keyof typeof operations] as boolean} onChange={e => setOperations({ ...operations, [key]: e.target.checked })} />{label}</label>)}</div>
+           <p className="text-xs text-muted-foreground">WhatsApp preferences are saved now, but no external messages are sent until a delivery provider is connected.</p>
            <div className="flex justify-end border-t border-border pt-4"><Button type="button" onClick={saveOperations} disabled={opsSaving} variant="outline" className="rounded-none uppercase tracking-widest">{opsSaving ? "Saving…" : "Save operations settings"}</Button></div>
          </section>
         <div className="md:col-span-2 flex justify-end border-t border-border pt-6"><Button type="submit" disabled={update.isPending} className="rounded-none px-8 uppercase tracking-widest">{update.isPending ? "Saving…" : "Save profile"}</Button></div>

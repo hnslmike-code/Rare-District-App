@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, sql } from "drizzle-orm";
 import {
   db, productsTable, productVariantsTable, inventoryAdjustmentTable,
   inventoryReservationTable, ordersTable, orderItemsTable, returnsTable,
@@ -8,6 +8,7 @@ import {
 import { requireAuth } from "../middlewares/auth";
 import { hasApprovedVendorAccess } from "../lib/security-boundaries";
 import { recordOrderItemLedgerEntry } from "./orders";
+import { createVendorAlert } from "../lib/vendor-notifications";
 
 const router: IRouter = Router();
 const variantAttributes = (value: unknown): Record<string, string> =>
@@ -28,9 +29,182 @@ async function ownProduct(userId: number, productId: number) {
 }
 
 async function syncAggregateStock(productId: number, tx: any = db) {
+  await tx.execute(sql`SELECT id FROM products WHERE id = ${productId} FOR UPDATE`);
   const [row] = await tx.select({ stock: sql<number>`coalesce(sum(${productVariantsTable.stock}), 0)` })
     .from(productVariantsTable).where(and(eq(productVariantsTable.productId, productId), eq(productVariantsTable.isActive, true)));
   await tx.update(productsTable).set({ stock: Number(row?.stock ?? 0) }).where(eq(productsTable.id, productId));
+}
+
+const formatVariant = (variant: typeof productVariantsTable.$inferSelect) => ({
+  ...variant,
+  priceAdjustment: Number(variant.priceAdjustment),
+  availableStock: variant.stock - variant.reservedStock,
+});
+
+type BulkStockUpdate = { variantId: number; stock: number; reason?: string; note?: string };
+
+class BulkStockUpdateError extends Error {
+  constructor(message: string, readonly details?: string[]) {
+    super(message);
+  }
+}
+
+function parseBulkStockUpdates(value: unknown): BulkStockUpdate[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 100) {
+    throw new BulkStockUpdateError("Choose between 1 and 100 variants to update.");
+  }
+  const seen = new Set<number>();
+  return value.map((entry, index) => {
+    const variantId = Number((entry as Record<string, unknown>)?.variantId);
+    const stock = Number((entry as Record<string, unknown>)?.stock);
+    if (!Number.isInteger(variantId) || variantId < 1 || !Number.isInteger(stock) || stock < 0 || stock > 1_000_000 || seen.has(variantId)) {
+      throw new BulkStockUpdateError(`Row ${index + 1} has an invalid or duplicate variant and stock value.`);
+    }
+    seen.add(variantId);
+    const rawReason = (entry as Record<string, unknown>).reason;
+    const rawNote = (entry as Record<string, unknown>).note;
+    const reason = typeof rawReason === "string"
+      ? rawReason.trim().slice(0, 80)
+      : undefined;
+    const note = typeof rawNote === "string"
+      ? rawNote.trim().slice(0, 500)
+      : undefined;
+    return { variantId, stock, reason, note };
+  });
+}
+
+async function applyBulkStockUpdate(
+  vendor: Awaited<ReturnType<typeof approvedVendor>>,
+  userId: number,
+  updates: BulkStockUpdate[],
+) {
+  if (!vendor) throw new BulkStockUpdateError("Approved vendor access is required.");
+  const updateById = new Map(updates.map(update => [update.variantId, update]));
+  const variantIds = [...updateById.keys()].sort((left, right) => left - right);
+
+  return db.transaction(async tx => {
+    for (const variantId of variantIds) {
+      await tx.execute(sql`SELECT id FROM product_variants WHERE id = ${variantId} FOR UPDATE`);
+    }
+
+    const rows = await tx.select({
+      variant: productVariantsTable,
+      product: productsTable,
+    }).from(productVariantsTable)
+      .innerJoin(productsTable, eq(productVariantsTable.productId, productsTable.id))
+      .where(inArray(productVariantsTable.id, variantIds));
+
+    if (rows.length !== updates.length || rows.some(row => row.product.vendorId !== vendor.id)) {
+      throw new BulkStockUpdateError("Every selected variant must belong to your catalog.");
+    }
+
+    const protectedRows = rows.filter(row => updateById.get(row.variant.id)!.stock < row.variant.reservedStock);
+    if (protectedRows.length) {
+      throw new BulkStockUpdateError(
+        "Stock cannot be below reserved stock.",
+        protectedRows.map(row => `${row.variant.sku} has ${row.variant.reservedStock} reserved.`),
+      );
+    }
+
+    const affectedProducts = new Set<number>();
+    const updatedVariants: Array<typeof productVariantsTable.$inferSelect> = [];
+    for (const row of rows) {
+      const update = updateById.get(row.variant.id)!;
+      const adjustment = update.stock - row.variant.stock;
+      if (adjustment === 0) {
+        updatedVariants.push(row.variant);
+        continue;
+      }
+      const [updated] = await tx.update(productVariantsTable)
+        .set({ stock: update.stock })
+        .where(eq(productVariantsTable.id, row.variant.id))
+        .returning();
+      await tx.insert(inventoryAdjustmentTable).values({
+        vendorId: vendor.id,
+        productId: row.variant.productId,
+        variantId: row.variant.id,
+        quantityChange: adjustment,
+        reason: update.reason || "bulk_update",
+        note: update.note || "Bulk inventory update",
+        createdBy: userId,
+      });
+      const previousAvailable = row.variant.stock - row.variant.reservedStock;
+      const available = updated.stock - updated.reservedStock;
+      if (previousAvailable > updated.lowStockThreshold && available <= updated.lowStockThreshold) {
+        await createVendorAlert(tx, vendor, {
+          type: "inventory",
+          title: `${updated.sku} needs attention`,
+          body: available <= 0
+            ? "This variant is out of available stock."
+            : `Only ${available} unit${available === 1 ? "" : "s"} remain available.`,
+          href: "/vendor-dashboard/inventory",
+        });
+      }
+      affectedProducts.add(row.variant.productId);
+      updatedVariants.push(updated);
+    }
+
+    for (const productId of [...affectedProducts].sort((left, right) => left - right)) await syncAggregateStock(productId, tx);
+    return updatedVariants.map(formatVariant);
+  });
+}
+
+function csvCell(value: unknown) {
+  let text = String(value ?? "");
+  if (/^[\t\r\n ]*[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+function parseCsvRows(source: string) {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = "";
+  let quoted = false;
+  for (let index = 0; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === '"') {
+      if (quoted && source[index + 1] === '"') { cell += '"'; index += 1; }
+      else quoted = !quoted;
+    } else if (character === "," && !quoted) {
+      row.push(cell); cell = "";
+    } else if ((character === "\n" || character === "\r") && !quoted) {
+      if (character === "\r" && source[index + 1] === "\n") index += 1;
+      row.push(cell); cell = "";
+      if (row.some(value => value.trim())) rows.push(row);
+      row = [];
+    } else {
+      cell += character;
+    }
+  }
+  if (quoted) throw new BulkStockUpdateError("The CSV has an unclosed quoted value.");
+  row.push(cell);
+  if (row.some(value => value.trim())) rows.push(row);
+  return rows;
+}
+
+function updatesFromCsv(source: unknown) {
+  if (typeof source !== "string" || source.length === 0 || source.length > 250_000) {
+    throw new BulkStockUpdateError("Upload a CSV file no larger than 250 KB.");
+  }
+  const rows = parseCsvRows(source);
+  if (rows.length < 2) throw new BulkStockUpdateError("The CSV needs a header and at least one inventory row.");
+  const header = rows[0].map(value => value.trim().toLowerCase().replace(/[\s_-]/g, ""));
+  const variantIdIndex = header.indexOf("variantid");
+  const stockIndex = header.indexOf("stock");
+  if (variantIdIndex < 0 || stockIndex < 0) {
+    throw new BulkStockUpdateError("The CSV must include Variant ID and Stock columns.");
+  }
+  const details: string[] = [];
+  const updates = rows.slice(1).map((row, index) => {
+    const rawVariantId = row[variantIdIndex]?.trim() ?? "";
+    const rawStock = row[stockIndex]?.trim() ?? "";
+    const variantId = Number(rawVariantId);
+    const stock = Number(rawStock);
+    if (!/^\d+$/.test(rawVariantId) || !/^\d+$/.test(rawStock) || !Number.isInteger(variantId) || !Number.isInteger(stock) || stock < 0) details.push(`Row ${index + 2} needs a whole-number Variant ID and Stock.`);
+    return { variantId, stock, reason: "csv_import", note: "CSV inventory import" };
+  });
+  if (details.length) throw new BulkStockUpdateError("Fix the highlighted CSV rows and try again.", details.slice(0, 10));
+  return parseBulkStockUpdates(updates);
 }
 
 router.get("/vendors/inventory/variants", requireAuth, async (req, res): Promise<void> => {
@@ -39,7 +213,7 @@ router.get("/vendors/inventory/variants", requireAuth, async (req, res): Promise
   const owned = await ownProduct(req.user!.userId, productId);
   if (!owned) { res.status(403).json({ error: "Approved vendor access is required." }); return; }
   const variants = await db.select().from(productVariantsTable).where(eq(productVariantsTable.productId, productId)).orderBy(desc(productVariantsTable.createdAt));
-  res.json(variants.map(variant => ({ ...variant, priceAdjustment: Number(variant.priceAdjustment), availableStock: variant.stock - variant.reservedStock })));
+  res.json(variants.map(formatVariant));
 });
 
 router.post("/vendors/inventory/variants", requireAuth, async (req, res): Promise<void> => {
@@ -67,7 +241,7 @@ router.post("/vendors/inventory/variants", requireAuth, async (req, res): Promis
       await syncAggregateStock(productId, tx);
       return created;
     });
-    res.status(201).json({ ...variant, priceAdjustment: Number(variant.priceAdjustment), availableStock: variant.stock });
+    res.status(201).json(formatVariant(variant));
   } catch (error) {
     if (String(error).includes("product_variants_product_sku_unique")) { res.status(409).json({ error: "That SKU already exists for this product." }); return; }
     throw error;
@@ -97,9 +271,77 @@ router.patch("/vendors/inventory/variants/:id", requireAuth, async (req, res): P
       note: typeof req.body?.note === "string" ? req.body.note.slice(0, 500) : null, createdBy: req.user!.userId,
     });
     await syncAggregateStock(variant.productId, tx);
+    const previousAvailable = variant.stock - variant.reservedStock;
+    const available = next.stock - next.reservedStock;
+    if (previousAvailable > next.lowStockThreshold && available <= next.lowStockThreshold) {
+      await createVendorAlert(tx, owned.vendor, {
+        type: "inventory",
+        title: `${next.sku} needs attention`,
+        body: available <= 0
+          ? "This variant is out of available stock."
+          : `Only ${available} unit${available === 1 ? "" : "s"} remain available.`,
+        href: "/vendor-dashboard/inventory",
+      });
+    }
     return next;
   });
-  res.json({ ...updated, priceAdjustment: Number(updated.priceAdjustment), availableStock: updated.stock - updated.reservedStock });
+  res.json(formatVariant(updated));
+});
+
+router.post("/vendors/inventory/variants/bulk-stock", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const vendor = await approvedVendor(req.user!.userId);
+    const updated = await applyBulkStockUpdate(vendor, req.user!.userId, parseBulkStockUpdates(req.body?.updates));
+    res.json({ updated, count: updated.length });
+  } catch (error) {
+    if (error instanceof BulkStockUpdateError) {
+      res.status(400).json({ error: error.message, details: error.details });
+      return;
+    }
+    throw error;
+  }
+});
+
+router.post("/vendors/inventory/variants/import", requireAuth, async (req, res): Promise<void> => {
+  try {
+    const vendor = await approvedVendor(req.user!.userId);
+    const updated = await applyBulkStockUpdate(vendor, req.user!.userId, updatesFromCsv(req.body?.csv));
+    res.json({ updated, count: updated.length });
+  } catch (error) {
+    if (error instanceof BulkStockUpdateError) {
+      res.status(400).json({ error: error.message, details: error.details });
+      return;
+    }
+    throw error;
+  }
+});
+
+router.get("/vendors/inventory/variants/export", requireAuth, async (req, res): Promise<void> => {
+  const productId = Number(req.query.productId);
+  if (!Number.isInteger(productId)) { res.status(400).json({ error: "A valid productId is required." }); return; }
+  const owned = await ownProduct(req.user!.userId, productId);
+  if (!owned) { res.status(403).json({ error: "Approved vendor access is required." }); return; }
+  const variants = await db.select().from(productVariantsTable)
+    .where(eq(productVariantsTable.productId, productId))
+    .orderBy(desc(productVariantsTable.createdAt));
+  const rows = [
+    ["Variant ID", "Product ID", "SKU", "Attributes", "Stock", "Reserved Stock", "Available Stock", "Low Stock Threshold", "Price Adjustment"],
+    ...variants.map(variant => [
+      variant.id,
+      variant.productId,
+      variant.sku,
+      Object.entries(variant.attributes).map(([key, value]) => `${key}=${value}`).join("; "),
+      variant.stock,
+      variant.reservedStock,
+      variant.stock - variant.reservedStock,
+      variant.lowStockThreshold,
+      Number(variant.priceAdjustment),
+    ]),
+  ];
+  res
+    .setHeader("Content-Type", "text/csv; charset=utf-8")
+    .setHeader("Content-Disposition", `attachment; filename="rare-district-variants-${productId}.csv"`)
+    .send(rows.map(row => row.map(csvCell).join(",")).join("\n"));
 });
 
 router.get("/vendors/inventory/adjustments", requireAuth, async (req, res): Promise<void> => {
@@ -123,11 +365,21 @@ router.post("/returns", requireAuth, async (req, res): Promise<void> => {
   if (existing) { res.status(409).json({ error: "A return is already active for this item." }); return; }
   const requestedAt = new Date();
   const responseDeadline = new Date(requestedAt.getTime() + 48 * 60 * 60 * 1000);
-  const [created] = await db.insert(returnsTable).values({
-    orderId, orderItemId, customerId: req.user!.userId, vendorId: item.vendorId, reason,
-    description: typeof req.body?.description === "string" ? req.body.description.slice(0, 2000) : null,
-    refundAmount: String(parseFloat(item.unitPrice) * item.quantity), requestedAt, responseDeadline,
-  }).returning();
+  const created = await db.transaction(async tx => {
+    const [request] = await tx.insert(returnsTable).values({
+      orderId, orderItemId, customerId: req.user!.userId, vendorId: item.vendorId, reason,
+      description: typeof req.body?.description === "string" ? req.body.description.slice(0, 2000) : null,
+      refundAmount: String(parseFloat(item.unitPrice) * item.quantity), requestedAt, responseDeadline,
+    }).returning();
+    const [vendor] = await tx.select().from(vendorsTable).where(eq(vendorsTable.id, item.vendorId));
+    if (vendor) await createVendorAlert(tx, vendor, {
+      type: "return",
+      title: "New return request",
+      body: `Order #${order.id} has a ${reason.replace("_", " ")} return request awaiting your response.`,
+      href: "/vendor-dashboard/returns",
+    });
+    return request;
+  });
   res.status(201).json(created);
 });
 
@@ -233,8 +485,27 @@ router.get("/notifications", requireAuth, async (req, res): Promise<void> => {
   res.json(await db.select().from(notificationsTable).where(eq(notificationsTable.userId, req.user!.userId)).orderBy(desc(notificationsTable.createdAt)).limit(100));
 });
 
+router.get("/notifications/unread-count", requireAuth, async (req, res): Promise<void> => {
+  const [row] = await db.select({ count: sql<number>`count(*)` }).from(notificationsTable)
+    .where(and(eq(notificationsTable.userId, req.user!.userId), isNull(notificationsTable.readAt)));
+  res.json({ unreadCount: Number(row?.count ?? 0) });
+});
+
+router.patch("/notifications/read-all", requireAuth, async (req, res): Promise<void> => {
+  const updated = await db.update(notificationsTable).set({ readAt: new Date() })
+    .where(and(eq(notificationsTable.userId, req.user!.userId), isNull(notificationsTable.readAt)))
+    .returning({ id: notificationsTable.id });
+  res.json({ count: updated.length });
+});
+
 router.patch("/notifications/:id/read", requireAuth, async (req, res): Promise<void> => {
   const [notification] = await db.update(notificationsTable).set({ readAt: new Date() }).where(and(eq(notificationsTable.id, Number(req.params.id)), eq(notificationsTable.userId, req.user!.userId))).returning();
+  if (!notification) { res.status(404).json({ error: "Notification not found." }); return; }
+  res.json(notification);
+});
+
+router.patch("/notifications/:id/unread", requireAuth, async (req, res): Promise<void> => {
+  const [notification] = await db.update(notificationsTable).set({ readAt: null }).where(and(eq(notificationsTable.id, Number(req.params.id)), eq(notificationsTable.userId, req.user!.userId))).returning();
   if (!notification) { res.status(404).json({ error: "Notification not found." }); return; }
   res.json(notification);
 });

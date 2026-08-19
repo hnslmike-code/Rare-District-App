@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, inArray, sql } from "drizzle-orm";
 import { db, ordersTable, orderItemsTable, productsTable, vendorsTable, transactionsTable, adminSettingsTable, inventoryReservationTable } from "@workspace/db";
 import { CreateOrderBody, GetOrderParams, UpdateOrderStatusParams, UpdateOrderStatusBody, ListOrdersQueryParams } from "@workspace/api-zod";
 import { requireAuth } from "../middlewares/auth";
@@ -13,6 +13,7 @@ import {
   type OrderStatus,
   vendorItemsForOrder,
 } from "../lib/security-boundaries";
+import { createVendorAlert } from "../lib/vendor-notifications";
 
 const router: IRouter = Router();
 
@@ -246,6 +247,19 @@ router.post("/orders", requireAuth, async (req, res): Promise<void> => {
         await tx.insert(inventoryReservationTable).values({
           orderId: created.id, orderItemId: createdItem.id, productId: item.productId,
           quantity: item.quantity, expiresAt: new Date(Date.now() + 30 * 60 * 1000),
+        });
+      }
+      const vendorIds = [...new Set(orderItems.map(item => item.vendorId))];
+      const vendors = vendorIds.length
+        ? await tx.select().from(vendorsTable).where(inArray(vendorsTable.id, vendorIds))
+        : [];
+      for (const vendor of vendors) {
+        const units = orderItems.filter(item => item.vendorId === vendor.id).reduce((total, item) => total + item.quantity, 0);
+        await createVendorAlert(tx, vendor, {
+          type: "order",
+          title: "New order received",
+          body: `Order #${created.id} includes ${units} unit${units === 1 ? "" : "s"} from your catalog.`,
+          href: "/vendor-dashboard/orders",
         });
       }
       return created;

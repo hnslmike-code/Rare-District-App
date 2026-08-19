@@ -9,6 +9,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { defaultVendorJoinPageContent, normalizeVendorJoinPageContent } from "../lib/vendor-join-content";
+import { createVendorAlert } from "../lib/vendor-notifications";
 
 const router: IRouter = Router();
 
@@ -715,6 +716,13 @@ router.patch("/admin/payouts/:id", requireAuth, requireRole("admin"), async (req
       paidAt: nextStatus === "paid" ? new Date() : record.paidAt,
       note: typeof req.body?.note === "string" ? req.body.note.slice(0, 500) : record.note,
     }).where(eq(payoutRecordsTable.id, record.id)).returning();
+    const [vendor] = await tx.select().from(vendorsTable).where(eq(vendorsTable.id, record.vendorId));
+    if (vendor) await createVendorAlert(tx, vendor, {
+      type: "payout",
+      title: `Payout ${nextStatus}`,
+      body: `Your ₦${Number(record.amount).toLocaleString()} payout is now ${nextStatus}.`,
+      href: "/vendor-dashboard/payouts",
+    });
     return next;
   });
   await recordAudit(req, "updated_vendor_payout", "payout", String(record.id), `Payout moved to ${nextStatus}`);
