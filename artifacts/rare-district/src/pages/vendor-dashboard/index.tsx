@@ -132,7 +132,7 @@ export default function VendorDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="font-serif">₦{product.price.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{product.wardrobeCount || 0} wishlisted</p>
+                    <p className="text-xs text-muted-foreground mt-1">{(product as any).unitsSold ?? 0} units sold · ₦{((product as any).vendorRevenue ?? 0).toLocaleString()} earned</p>
                   </div>
                 </div>
               ))

@@ -510,6 +510,50 @@ router.post("/admin/vendors/:id/payout", requireAuth, requireRole("admin"), asyn
   });
 });
 
+// PATCH /admin/payouts/:id — review a vendor-requested payout.
+router.patch("/admin/payouts/:id", requireAuth, requireRole("admin"), async (req, res): Promise<void> => {
+  const payoutId = Number(Array.isArray(req.params.id) ? req.params.id[0] : req.params.id);
+  const nextStatus = req.body?.status;
+  if (!Number.isInteger(payoutId) || !["approved", "paid", "failed", "reversed"].includes(nextStatus)) {
+    res.status(400).json({ error: "Invalid payout update." });
+    return;
+  }
+  const [record] = await db.select().from(payoutRecordsTable).where(eq(payoutRecordsTable.id, payoutId));
+  if (!record) {
+    res.status(404).json({ error: "Payout not found." });
+    return;
+  }
+  const transitions: Record<string, string[]> = {
+    pending: ["approved", "failed"],
+    approved: ["paid", "failed"],
+    paid: ["reversed"],
+    failed: [],
+    reversed: [],
+  };
+  if (!transitions[record.status]?.includes(nextStatus)) {
+    res.status(409).json({ error: `Cannot move payout from ${record.status} to ${nextStatus}.` });
+    return;
+  }
+  const shouldRestoreBalance = nextStatus === "failed" || nextStatus === "reversed";
+  const updated = await db.transaction(async (tx) => {
+    if (shouldRestoreBalance) {
+      await tx.update(vendorsTable)
+        .set({ payoutBalance: sql`${vendorsTable.payoutBalance} + ${record.amount}` })
+        .where(eq(vendorsTable.id, record.vendorId));
+    }
+    const [next] = await tx.update(payoutRecordsTable).set({
+      status: nextStatus as "approved" | "paid" | "failed" | "reversed",
+      reference: typeof req.body?.reference === "string" ? req.body.reference.slice(0, 120) : record.reference,
+      reviewedAt: new Date(),
+      paidAt: nextStatus === "paid" ? new Date() : record.paidAt,
+      note: typeof req.body?.note === "string" ? req.body.note.slice(0, 500) : record.note,
+    }).where(eq(payoutRecordsTable.id, record.id)).returning();
+    return next;
+  });
+  await recordAudit(req, "updated_vendor_payout", "payout", String(record.id), `Payout moved to ${nextStatus}`);
+  res.json({ id: updated.id, vendorId: updated.vendorId, amount: Number(updated.amount), status: updated.status, reference: updated.reference, reviewedAt: updated.reviewedAt, paidAt: updated.paidAt });
+});
+
 // GET /admin/operations
 router.get("/admin/operations", requireAuth, requireRole("admin"), async (_req, res): Promise<void> => {
   const [lowStock, pendingVendors, customers, auditLogs, categories] = await Promise.all([

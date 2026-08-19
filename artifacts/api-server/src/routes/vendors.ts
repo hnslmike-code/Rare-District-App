@@ -145,6 +145,58 @@ router.patch("/vendors/me", requireAuth, async (req, res): Promise<void> => {
   res.json(formatVendor(vendor, user));
 });
 
+// Operational settings are kept separate from the public vendor profile.
+router.get("/vendors/me/operations-settings", requireAuth, async (req, res): Promise<void> => {
+  const vendor = await getApprovedVendor(req.user!.userId);
+  if (!vendor) {
+    res.status(403).json({ error: "Vendor approval is required." });
+    return;
+  }
+  res.json({
+    shippingRegions: vendor.shippingRegions,
+    processingDays: vendor.processingDays,
+    returnWindowDays: vendor.returnWindowDays,
+    returnConditions: vendor.returnConditions,
+    cancellationPolicy: vendor.cancellationPolicy,
+    notificationPreferences: vendor.notificationPreferences,
+  });
+});
+
+router.patch("/vendors/me/operations-settings", requireAuth, async (req, res): Promise<void> => {
+  const vendor = await getApprovedVendor(req.user!.userId);
+  if (!vendor) {
+    res.status(403).json({ error: "Vendor approval is required." });
+    return;
+  }
+  const body = req.body ?? {};
+  const shippingRegions = Array.isArray(body.shippingRegions)
+    ? body.shippingRegions.filter((value: unknown): value is string => typeof value === "string" && value.trim().length > 0).slice(0, 30).map((value: string) => value.trim())
+    : vendor.shippingRegions;
+  const processingDays = Number(body.processingDays);
+  const returnWindowDays = Number(body.returnWindowDays);
+  if (!Number.isInteger(processingDays) || processingDays < 1 || processingDays > 90 ||
+      !Number.isInteger(returnWindowDays) || returnWindowDays < 0 || returnWindowDays > 90) {
+    res.status(400).json({ error: "Processing and return windows must be valid day counts." });
+    return;
+  }
+  const notificationPreferences = body.notificationPreferences && typeof body.notificationPreferences === "object"
+    ? Object.fromEntries(Object.entries(body.notificationPreferences).filter(([, value]) => typeof value === "boolean")) as Record<string, boolean>
+    : vendor.notificationPreferences;
+  const [updated] = await db.update(vendorsTable).set({
+    shippingRegions,
+    processingDays,
+    returnWindowDays,
+    returnConditions: typeof body.returnConditions === "string" ? body.returnConditions.slice(0, 2000) : vendor.returnConditions,
+    cancellationPolicy: typeof body.cancellationPolicy === "string" ? body.cancellationPolicy.slice(0, 2000) : vendor.cancellationPolicy,
+    notificationPreferences,
+  }).where(eq(vendorsTable.id, vendor.id)).returning();
+  res.json({
+    shippingRegions: updated.shippingRegions, processingDays: updated.processingDays,
+    returnWindowDays: updated.returnWindowDays, returnConditions: updated.returnConditions,
+    cancellationPolicy: updated.cancellationPolicy, notificationPreferences: updated.notificationPreferences,
+  });
+});
+
 // GET /vendors/dashboard
 router.get("/vendors/dashboard", requireAuth, async (req, res): Promise<void> => {
   const vendor = await getApprovedVendor(req.user!.userId);
@@ -163,10 +215,24 @@ router.get("/vendors/dashboard", requireAuth, async (req, res): Promise<void> =>
   const pendingOrders = orders.filter(o => o.status === "paid" || o.status === "processing").length;
   const products = await db.select().from(productsTable).where(and(eq(productsTable.vendorId, vendor.id), eq(productsTable.isActive, true)));
 
-  const topProducts = await db.select().from(productsTable)
-    .where(eq(productsTable.vendorId, vendor.id))
-    .orderBy(desc(productsTable.wardrobeCount))
+  const salesRows = await db.select({
+    productId: orderItemsTable.productId,
+    unitsSold: sql<number>`coalesce(sum(${orderItemsTable.quantity}), 0)`,
+    revenue: sql<number>`coalesce(sum(${orderItemsTable.vendorAmount}), 0)`,
+  }).from(orderItemsTable)
+    .innerJoin(transactionsTable, and(
+      eq(transactionsTable.orderId, orderItemsTable.orderId),
+      eq(transactionsTable.vendorId, vendor.id),
+      eq(transactionsTable.status, "success"),
+    ))
+    .where(eq(orderItemsTable.vendorId, vendor.id))
+    .groupBy(orderItemsTable.productId)
+    .orderBy(desc(sql`coalesce(sum(${orderItemsTable.quantity}), 0)`))
     .limit(5);
+  const topProductRows = salesRows.length > 0
+    ? await db.select().from(productsTable).where(and(eq(productsTable.vendorId, vendor.id), inArray(productsTable.id, salesRows.map(row => row.productId))))
+    : [];
+  const salesByProduct = new Map(salesRows.map(row => [row.productId, row]));
 
   const monthlyRows = await db.select({
     month: sql<string>`to_char(date_trunc('month', ${transactionsTable.createdAt}), 'Mon YYYY')`,
@@ -184,11 +250,13 @@ router.get("/vendors/dashboard", requireAuth, async (req, res): Promise<void> =>
     totalProducts: products.length,
     payoutBalance: parseFloat(vendor.payoutBalance ?? "0"),
     monthlySales: monthlyRows.map(row => ({ month: row.month, revenue: Number(row.revenue) })),
-    topProducts: topProducts.map(p => ({
+     topProducts: topProductRows.sort((a, b) => (Number(salesByProduct.get(b.id)?.unitsSold ?? 0) - Number(salesByProduct.get(a.id)?.unitsSold ?? 0))).map(p => ({
       id: p.id, vendorId: p.vendorId, name: p.name, description: p.description,
       price: parseFloat(p.price), currency: p.currency, category: p.category,
       sizes: p.sizes, images: p.images, stock: p.stock, isActive: p.isActive,
-      isFeatured: p.isFeatured, wardrobeCount: p.wardrobeCount,
+       isFeatured: p.isFeatured, wardrobeCount: p.wardrobeCount,
+       unitsSold: Number(salesByProduct.get(p.id)?.unitsSold ?? 0),
+       vendorRevenue: Number(salesByProduct.get(p.id)?.revenue ?? 0),
       averageRating: null, reviewCount: 0, createdAt: p.createdAt,
     })),
   });
@@ -292,12 +360,20 @@ router.patch("/vendors/orders/:orderId/items/:itemId/fulfillment", requireAuth, 
     res.status(400).json({ error: "Tracking number is required before shipping." });
     return;
   }
-  const [updated] = await db.update(orderItemsTable).set({
-    fulfillmentStatus: status as typeof item.fulfillmentStatus,
-    trackingNumber: trackingNumber ?? item.trackingNumber,
-    carrier: carrier ?? item.carrier,
-    shippedAt: status === "shipped" ? new Date() : item.shippedAt,
-  }).where(eq(orderItemsTable.id, item.id)).returning();
+  const updated = await db.transaction(async (tx) => {
+    if (status === "cancelled") {
+      await tx.update(productsTable)
+        .set({ stock: sql`${productsTable.stock} + ${item.quantity}` })
+        .where(eq(productsTable.id, item.productId));
+    }
+    const [next] = await tx.update(orderItemsTable).set({
+      fulfillmentStatus: status as typeof item.fulfillmentStatus,
+      trackingNumber: trackingNumber ?? item.trackingNumber,
+      carrier: carrier ?? item.carrier,
+      shippedAt: status === "shipped" ? new Date() : item.shippedAt,
+    }).where(eq(orderItemsTable.id, item.id)).returning();
+    return next;
+  });
   res.json({
     id: updated.id, orderId: updated.orderId, productId: updated.productId,
     fulfillmentStatus: updated.fulfillmentStatus, trackingNumber: updated.trackingNumber,
