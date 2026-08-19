@@ -27,7 +27,7 @@ type CarouselEntry =
 function imageUrl(product?: Product) {
   const image = product?.images?.[0];
   if (!image) return undefined;
-  return image.startsWith("http") || image.startsWith("/") ? image : `/api/storage/objects/${image}`;
+  return image.startsWith("http") || image.startsWith("/") || image.startsWith("data:") ? image : `/api/storage/objects/${image}`;
 }
 
 function money(product: Product) {
