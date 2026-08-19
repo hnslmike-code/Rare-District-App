@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/contexts/AuthContext";
 import { Search, User as UserIcon, Menu, X, ArrowRight } from "lucide-react";
+import { useGetWardrobe } from "@workspace/api-client-react";
 import { CursorGlow } from "@/components/visuals/CursorGlow";
 import { BottomNav } from "@/components/layout/BottomNav";
 import { DistrictSidebar } from "@/components/layout/DistrictSidebar";
@@ -23,6 +24,14 @@ export function MainLayout({ children }: { children: React.ReactNode }) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), []);
+
+  const { data: wardrobe } = useGetWardrobe({
+    query: {
+      enabled: isAuthenticated,
+      queryKey: ["wardrobe"],
+    },
+  });
+  const wardrobeCount = Array.isArray(wardrobe) ? wardrobe.length : 0;
 
   // Close menus on route change
   useEffect(() => {
