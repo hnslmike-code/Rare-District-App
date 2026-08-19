@@ -186,6 +186,7 @@ export default function Home() {
   const popular = useListProducts({ sortBy: "popular", limit: 4 }, { query: { queryKey: ["home-products", "popular"] } });
   const [quickAdd, setQuickAdd] = useState<Product | null>(null);
   const products = (newest.data?.items || []) as Product[];
+  const heroProducts = products.slice(0, 2);
   const edit = useMemo<CarouselEntry[]>(() => {
     const source = products.slice(0, 6);
     return source.flatMap((product, index) => {
@@ -205,12 +206,32 @@ export default function Home() {
     <div className="home-page">
       <section className="rd-hero">
         <div className="rd-hero-copy">
-          <p className="eyebrow">Lagos / Global · Private access</p>
-          <h1>Curated.<br /><em>Not assembled.</em></h1>
-          <p className="rd-hero-description">Contemporary African fashion, selected with intention and delivered from the designers shaping what comes next.</p>
-          <Link href="/shop" className="rd-primary-button" data-testid="link-enter-district">Enter the district <ArrowRight className="h-4 w-4" /></Link>
+          <p className="rd-hero-kicker"><span aria-hidden="true" /> Drop 01 / now live</p>
+          <h1>Wear the<br /><em>next wave.</em></h1>
+          <p className="rd-hero-description">The new names, rare pieces, and future-facing African fashion worth finding before everyone else does.</p>
+          <div className="rd-hero-actions">
+            <Link href="/shop?category=new" className="rd-primary-button" data-testid="link-enter-district">Shop new drop <ArrowRight className="h-4 w-4" /></Link>
+            <Link href="/shop?category=designers" className="rd-hero-secondary">Meet the designers <ArrowRight className="h-4 w-4" /></Link>
+          </div>
+          <p className="rd-hero-proof">Independent labels <span>·</span> Private releases <span>·</span> Lagos to global</p>
         </div>
-        <div className="rd-hero-stamp"><img src="/brand/rd-mark.png" alt="" /><span>Built different<br />Made rare</span></div>
+        <div className="rd-hero-visual" aria-label="New arrivals preview">
+          <p className="rd-hero-visual-label">Rare District<br />Future archive</p>
+          <span className="rd-hero-release">01</span>
+          {heroProducts[0] ? (
+            <Link href={`/product/${heroProducts[0].id}`} className="rd-hero-product rd-hero-product-main">
+              {imageUrl(heroProducts[0]) ? <img src={imageUrl(heroProducts[0])} alt={heroProducts[0].name} /> : <ProductPlaceholder product={heroProducts[0]} />}
+              <span>{heroProducts[0].name}</span>
+            </Link>
+          ) : <div className="rd-hero-product rd-hero-product-main rd-hero-product-empty"><img src="/brand/rd-mark.png" alt="" /></div>}
+          {heroProducts[1] ? (
+            <Link href={`/product/${heroProducts[1].id}`} className="rd-hero-product rd-hero-product-side">
+              {imageUrl(heroProducts[1]) ? <img src={imageUrl(heroProducts[1])} alt={heroProducts[1].name} /> : <ProductPlaceholder product={heroProducts[1]} />}
+              <span>{heroProducts[1].name}</span>
+            </Link>
+          ) : null}
+          <p className="rd-hero-location">Lagos <span>/</span> Worldwide</p>
+        </div>
       </section>
 
       <section className="carousel-section" data-testid="section-featured-carousel">
