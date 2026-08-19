@@ -703,28 +703,42 @@ router.patch("/admin/payouts/:id", requireAuth, requireRole("admin"), async (req
     return;
   }
   const shouldRestoreBalance = nextStatus === "failed" || nextStatus === "reversed";
-  const updated = await db.transaction(async (tx) => {
+  const result = await db.transaction(async (tx) => {
+    // Serialize all status changes for this payout. A second request may have
+    // read the old status before the first transaction committed, so the
+    // transition must be checked again after acquiring the row lock.
+    await tx.execute(sql`SELECT id FROM payout_records WHERE id = ${record.id} FOR UPDATE`);
+    const [lockedRecord] = await tx.select().from(payoutRecordsTable).where(eq(payoutRecordsTable.id, record.id));
+    if (!lockedRecord || !transitions[lockedRecord.status]?.includes(nextStatus)) {
+      return { conflict: true as const, status: lockedRecord?.status ?? record.status };
+    }
+
     if (shouldRestoreBalance) {
       await tx.update(vendorsTable)
-        .set({ payoutBalance: sql`${vendorsTable.payoutBalance} + ${record.amount}` })
-        .where(eq(vendorsTable.id, record.vendorId));
+        .set({ payoutBalance: sql`${vendorsTable.payoutBalance} + ${lockedRecord.amount}` })
+        .where(eq(vendorsTable.id, lockedRecord.vendorId));
     }
     const [next] = await tx.update(payoutRecordsTable).set({
       status: nextStatus as "approved" | "paid" | "failed" | "reversed",
-      reference: typeof req.body?.reference === "string" ? req.body.reference.slice(0, 120) : record.reference,
+      reference: typeof req.body?.reference === "string" ? req.body.reference.slice(0, 120) : lockedRecord.reference,
       reviewedAt: new Date(),
-      paidAt: nextStatus === "paid" ? new Date() : record.paidAt,
-      note: typeof req.body?.note === "string" ? req.body.note.slice(0, 500) : record.note,
-    }).where(eq(payoutRecordsTable.id, record.id)).returning();
-    const [vendor] = await tx.select().from(vendorsTable).where(eq(vendorsTable.id, record.vendorId));
+      paidAt: nextStatus === "paid" ? new Date() : lockedRecord.paidAt,
+      note: typeof req.body?.note === "string" ? req.body.note.slice(0, 500) : lockedRecord.note,
+    }).where(eq(payoutRecordsTable.id, lockedRecord.id)).returning();
+    const [vendor] = await tx.select().from(vendorsTable).where(eq(vendorsTable.id, lockedRecord.vendorId));
     if (vendor) await createVendorAlert(tx, vendor, {
       type: "payout",
       title: `Payout ${nextStatus}`,
-      body: `Your ₦${Number(record.amount).toLocaleString()} payout is now ${nextStatus}.`,
+      body: `Your ₦${Number(lockedRecord.amount).toLocaleString()} payout is now ${nextStatus}.`,
       href: "/vendor-dashboard/payouts",
     });
-    return next;
+    return { conflict: false as const, updated: next };
   });
+  if (result.conflict) {
+    res.status(409).json({ error: `Cannot move payout from ${result.status} to ${nextStatus}.` });
+    return;
+  }
+  const updated = result.updated;
   await recordAudit(req, "updated_vendor_payout", "payout", String(record.id), `Payout moved to ${nextStatus}`);
   res.json({ id: updated.id, vendorId: updated.vendorId, amount: Number(updated.amount), status: updated.status, reference: updated.reference, reviewedAt: updated.reviewedAt, paidAt: updated.paidAt });
 });

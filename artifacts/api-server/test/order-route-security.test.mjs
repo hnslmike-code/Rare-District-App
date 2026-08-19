@@ -563,13 +563,24 @@ if (!databaseUrl) {
       const failedPayout = await failedPayoutRequest.json();
       created.payouts.push(failedPayout.id);
       assert.equal(await payoutBalanceFor(vendorA.id), 2000);
-      const failedPayoutResponse = await fetch(`${apiUrl}/admin/payouts/${failedPayout.id}`, {
-        method: "PATCH",
-        headers: auth(adminUser),
-        body: JSON.stringify({ status: "failed" }),
-      });
-      assert.equal(failedPayoutResponse.status, 200);
-      assert.equal((await failedPayoutResponse.json()).status, "failed");
+      const failedPayoutResponses = await Promise.all([
+        fetch(`${apiUrl}/admin/payouts/${failedPayout.id}`, {
+          method: "PATCH",
+          headers: auth(adminUser),
+          body: JSON.stringify({ status: "failed" }),
+        }),
+        fetch(`${apiUrl}/admin/payouts/${failedPayout.id}`, {
+          method: "PATCH",
+          headers: auth(adminUser),
+          body: JSON.stringify({ status: "failed" }),
+        }),
+      ]);
+      assert.deepEqual(failedPayoutResponses.map(response => response.status).sort(), [200, 409]);
+      const failedPayoutConflict = failedPayoutResponses.find(response => response.status === 409);
+      assert.match((await failedPayoutConflict.json()).error, /Cannot move payout from failed to failed/);
+      assert.equal((await failedPayoutResponses.find(response => response.status === 200).json()).status, "failed");
+      const failedPayoutState = await query("SELECT status FROM payout_records WHERE id = $1", [failedPayout.id]);
+      assert.equal(failedPayoutState.rows[0].status, "failed");
       assert.equal(await payoutBalanceFor(vendorA.id), 3000);
 
       const reversedPayoutRequest = await fetch(`${apiUrl}/vendors/me/payout-request`, {
@@ -590,20 +601,24 @@ if (!databaseUrl) {
         headers: auth(adminUser),
         body: JSON.stringify({ status: "paid" }),
       })).status, 200);
-      const reversedPayoutResponse = await fetch(`${apiUrl}/admin/payouts/${reversedPayout.id}`, {
-        method: "PATCH",
-        headers: auth(adminUser),
-        body: JSON.stringify({ status: "reversed" }),
-      });
-      assert.equal(reversedPayoutResponse.status, 200);
-      assert.equal((await reversedPayoutResponse.json()).status, "reversed");
-      assert.equal(await payoutBalanceFor(vendorA.id), 3000);
-      const repeatedReversalResponse = await fetch(`${apiUrl}/admin/payouts/${reversedPayout.id}`, {
-        method: "PATCH",
-        headers: auth(adminUser),
-        body: JSON.stringify({ status: "reversed" }),
-      });
-      assert.equal(repeatedReversalResponse.status, 409);
+      const reversedPayoutResponses = await Promise.all([
+        fetch(`${apiUrl}/admin/payouts/${reversedPayout.id}`, {
+          method: "PATCH",
+          headers: auth(adminUser),
+          body: JSON.stringify({ status: "reversed" }),
+        }),
+        fetch(`${apiUrl}/admin/payouts/${reversedPayout.id}`, {
+          method: "PATCH",
+          headers: auth(adminUser),
+          body: JSON.stringify({ status: "reversed" }),
+        }),
+      ]);
+      assert.deepEqual(reversedPayoutResponses.map(response => response.status).sort(), [200, 409]);
+      const reversedPayoutConflict = reversedPayoutResponses.find(response => response.status === 409);
+      assert.match((await reversedPayoutConflict.json()).error, /Cannot move payout from reversed to reversed/);
+      assert.equal((await reversedPayoutResponses.find(response => response.status === 200).json()).status, "reversed");
+      const reversedPayoutState = await query("SELECT status FROM payout_records WHERE id = $1", [reversedPayout.id]);
+      assert.equal(reversedPayoutState.rows[0].status, "reversed");
       assert.equal(await payoutBalanceFor(vendorA.id), 3000);
 
       for (const user of [pendingUser, rejectedUser, suspendedUser]) {
