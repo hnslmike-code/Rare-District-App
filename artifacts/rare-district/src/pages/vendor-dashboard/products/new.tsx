@@ -17,6 +17,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { mediaUrl } from "@/lib/media-url";
 import { useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ImagePlus, X } from "lucide-react";
 
@@ -86,7 +87,7 @@ export default function VendorNewProduct() {
     }
   };
 
-  const displayImage = (value: string) => value.startsWith("http") || value.startsWith("/") ? value : `/api/storage/objects/${value}`;
+  const displayImage = (value: string) => mediaUrl(value) ?? "";
 
   const removeImage = (idx: number) => {
     setImages(images.filter((_, i) => i !== idx));

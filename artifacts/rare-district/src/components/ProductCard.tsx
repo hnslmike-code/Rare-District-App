@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { useAddToWardrobe, getGetWardrobeQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { mediaUrl } from "@/lib/media-url";
 import { useAuth } from "@/contexts/AuthContext";
 import { ShoppingBag } from "lucide-react";
 
@@ -85,11 +86,7 @@ export function ProductCard({ product, dataTestId, showWardrobe = true }: Produc
     card.style.setProperty("--glow-y", "50%");
   };
 
-  const imageUrl = product.images && product.images.length > 0
-    ? product.images[0].startsWith("http") || product.images[0].startsWith("/") || product.images[0].startsWith("data:")
-      ? product.images[0]
-      : `/api/storage/objects/${product.images[0]}`
-    : undefined;
+  const imageUrl = mediaUrl(product.images?.[0]);
 
   return (
     <article

@@ -4,6 +4,7 @@ import { useListAdminProducts } from "@workspace/api-client-react";
 import { Check, Clock3, Eye, Loader2, Plus, Save, Send, SlidersHorizontal, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { adminJson } from "@/lib/admin-control";
+import { mediaUrl } from "@/lib/media-url";
 
 type HomepageContent = {
   hero: {
@@ -83,15 +84,17 @@ export default function AdminMerchandising() {
     }
     setUploadingAd(true);
     try {
+      const token = localStorage.getItem("token");
+      if (!token) throw new Error("Sign in as an admin before uploading campaign media.");
       const request = await fetch("/api/storage/uploads/request-url", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
       });
       if (!request.ok) throw new Error("Could not prepare the upload.");
       const { uploadURL, objectPath } = await request.json();
       const upload = await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
-      if (!upload.ok) throw new Error("The media upload did not complete.");
+      if (!upload.ok) throw new Error(`The media upload did not complete (${upload.status}).`);
       setDraft(current => current ? {
         ...current,
         ads: [...current.ads, {
@@ -169,7 +172,7 @@ export default function AdminMerchandising() {
               {draft.ads.map((ad, index) => (
                 <div key={ad.id} className={`grid gap-4 border p-3 md:grid-cols-[10rem_1fr_auto] ${ad.active ? "border-foreground/40" : "border-border opacity-60"}`}>
                   <div className="aspect-video overflow-hidden bg-secondary">
-                    {ad.mediaType === "video" ? <video src={ad.mediaUrl.startsWith("/") ? `/api/storage${ad.mediaUrl}` : `/api/storage/objects/${ad.mediaUrl}`} muted playsInline /> : <img src={ad.mediaUrl.startsWith("/") ? `/api/storage${ad.mediaUrl}` : `/api/storage/objects/${ad.mediaUrl}`} alt="" className="h-full w-full object-cover" />}
+                    {ad.mediaType === "video" ? <video src={mediaUrl(ad.mediaUrl)} muted playsInline /> : <img src={mediaUrl(ad.mediaUrl)} alt="" className="h-full w-full object-cover" />}
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className={labelClass}>Alt text<input value={ad.alt} onChange={event => changeAd(ad.id, "alt", event.target.value)} className={inputClass} /></label>

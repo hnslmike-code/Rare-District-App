@@ -87,7 +87,7 @@ export default function AdminProducts() {
                   <td className="py-4 px-4 font-medium max-w-xs">
                     <div className="flex items-center gap-3">
                       {product.images && product.images.length > 0 ? (
-                        <img src={`/api/storage/objects/${product.images[0]}`} alt={product.name} className="w-10 h-10 object-cover flex-shrink-0" />
+                        <img src={product.images[0].startsWith("/objects/") ? `/api/storage${product.images[0]}` : `/api/storage/objects/${product.images[0]}`} alt={product.name} className="w-10 h-10 object-cover flex-shrink-0" />
                       ) : (
                         <div className="w-10 h-10 bg-secondary flex items-center justify-center flex-shrink-0">
                           <Package className="w-4 h-4 text-muted-foreground" />

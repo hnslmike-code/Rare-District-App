@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ProductCard } from "@/components/ProductCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { mediaUrl } from "@/lib/media-url";
 
 type Product = {
   id: number;
@@ -47,8 +48,7 @@ type HomepageAd = {
 };
 
 function adMediaUrl(url: string) {
-  if (url.startsWith("/objects/")) return `/api/storage${url}`;
-  return url.startsWith("http") || url.startsWith("/") ? url : `/api/storage/objects/${url}`;
+  return mediaUrl(url) ?? "";
 }
 
 function AdvertisingCarousel({ ads }: { ads: HomepageAd[] }) {
@@ -133,9 +133,7 @@ function BrandDirectory({ vendors }: { vendors: BrandVendor[] }) {
 }
 
 function imageUrl(product?: Product) {
-  const image = product?.images?.[0];
-  if (!image) return undefined;
-  return image.startsWith("http") || image.startsWith("/") || image.startsWith("data:") ? image : `/api/storage/objects/${image}`;
+  return mediaUrl(product?.images?.[0]);
 }
 
 function money(product: Product) {

@@ -2,8 +2,9 @@ import { Link, useRoute } from "wouter";
 import { useGetVendor, useListProducts } from "@workspace/api-client-react";
 import { ArrowLeft, ArrowRight, BookOpen } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { mediaUrl } from "@/lib/media-url";
 
-const imageUrl = (image?: string) => image ? (image.startsWith("http") || image.startsWith("/") ? image : `/api/storage/objects/${image}`) : undefined;
+const imageUrl = (image?: string) => mediaUrl(image);
 
 export default function Lookbook() {
   const [, params] = useRoute("/lookbook/:id");
