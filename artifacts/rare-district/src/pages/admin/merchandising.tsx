@@ -142,7 +142,7 @@ export default function AdminMerchandising() {
 
       <div className="grid gap-6 xl:grid-cols-[1.1fr_.9fr]">
         <section className="space-y-6">
-          <div className="border border-border p-5 md:p-6">
+          <div id="homepage-advertising" className="scroll-mt-6 border border-border p-5 md:p-6">
             <div className="mb-5 flex items-center gap-2"><SlidersHorizontal className="h-4 w-4" /><h2 className="font-serif text-2xl">Hero content</h2></div>
             <div className="grid gap-4 md:grid-cols-2">
               <label className={labelClass}>Drop label<input value={draft.hero.eyebrow} onChange={event => changeHero("eyebrow", event.target.value)} className={inputClass} /></label>
@@ -217,7 +217,8 @@ export default function AdminMerchandising() {
           <div className="border border-border p-5 md:p-6">
             <h2 className="font-serif text-2xl">Homepage sections</h2>
             <div className="mt-4 space-y-2">
-              {([["latest", "New in the district"], ["editorial", "Editorial band"], ["designers", "Featured designers"]] as const).map(([key, label]) => <label key={key} className="flex cursor-pointer items-center justify-between border border-border p-3 text-sm"><span>{label}</span><input type="checkbox" checked={draft.sections[key]} onChange={event => changeSection(key, event.target.checked)} /></label>)}
+              {([["latest", "New in the district"], ["editorial", "Homepage advertising"], ["designers", "Featured designers"]] as const).map(([key, label]) => <label key={key} className="flex cursor-pointer items-center justify-between border border-border p-3 text-sm"><span>{label}</span><input type="checkbox" checked={draft.sections[key]} onChange={event => changeSection(key, event.target.checked)} /></label>)}
+              <a href="#homepage-advertising" className="mt-3 inline-flex text-xs font-bold uppercase tracking-widest underline underline-offset-4 hover:no-underline">Configure ads <Plus className="ml-2 h-3.5 w-3.5" /></a>
             </div>
           </div>
 
