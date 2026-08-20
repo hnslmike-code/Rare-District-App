@@ -36,8 +36,13 @@ const defaultHomepageContent: HomepageContent = {
     productIds: [],
   },
   carousel: { eyebrow: "The district edit / 01", title: "Pieces with presence.", productIds: [], autoplay: true },
+  ads: [],
   sections: { latest: true, editorial: true, designers: true },
 };
+
+function normalizeHomepageContent(value: HomepageContent): HomepageContent {
+  return { ...value, ads: Array.isArray(value.ads) ? value.ads : [] };
+}
 
 function isShortText(value: unknown, max: number) {
   return typeof value === "string" && value.trim().length > 0 && value.length <= max;
@@ -53,6 +58,7 @@ function isHomepageContent(value: unknown): value is HomepageContent {
   const hero = content.hero;
   const carousel = content.carousel;
   const sections = content.sections;
+  const ads = content.ads;
   return Boolean(
     hero && carousel && sections &&
     [hero.eyebrow, hero.title, hero.accent, hero.description, hero.primaryLabel, hero.secondaryLabel, hero.release, hero.visualLabel, hero.location].every(item => isShortText(item, 400)) &&
@@ -61,13 +67,19 @@ function isHomepageContent(value: unknown): value is HomepageContent {
     Array.isArray(hero.proof) && hero.proof.length > 0 && hero.proof.length <= 4 && hero.proof.every(item => isShortText(item, 50)) &&
     isProductIdList(hero.productIds, 2) &&
     isShortText(carousel.eyebrow, 80) && isShortText(carousel.title, 100) && isProductIdList(carousel.productIds, 12) && typeof carousel.autoplay === "boolean" &&
+    Array.isArray(ads) && ads.length <= 12 && ads.every(ad => ad && typeof ad === "object" && isShortText(ad.id, 80) && (ad.mediaType === "image" || ad.mediaType === "video") && isShortText(ad.mediaUrl, 500) && isShortText(ad.href, 500) && isShortText(ad.alt, 160) && typeof ad.active === "boolean" && Number.isInteger(ad.duration) && ad.duration >= 2 && ad.duration <= 30) &&
     typeof sections.latest === "boolean" && typeof sections.editorial === "boolean" && typeof sections.designers === "boolean",
   );
 }
 
 async function getHomepageConfig() {
   const [existing] = await db.select().from(homepageConfigsTable).orderBy(asc(homepageConfigsTable.id)).limit(1);
-  if (existing) return existing;
+  if (existing) return {
+    ...existing,
+    draftContent: normalizeHomepageContent(existing.draftContent),
+    publishedContent: existing.publishedContent ? normalizeHomepageContent(existing.publishedContent) : null,
+    scheduledContent: existing.scheduledContent ? normalizeHomepageContent(existing.scheduledContent) : null,
+  };
   const [created] = await db.insert(homepageConfigsTable).values({ draftContent: defaultHomepageContent }).returning();
   return created;
 }
@@ -262,9 +274,9 @@ router.get("/admin/homepage", requireAuth, requireRole("admin"), async (_req, re
   const config = await getHomepageConfig();
   res.json({
     id: config.id,
-    draftContent: config.draftContent,
-    publishedContent: config.publishedContent,
-    scheduledContent: config.scheduledContent,
+    draftContent: normalizeHomepageContent(config.draftContent),
+    publishedContent: config.publishedContent ? normalizeHomepageContent(config.publishedContent) : null,
+    scheduledContent: config.scheduledContent ? normalizeHomepageContent(config.scheduledContent) : null,
     scheduledAt: config.scheduledAt,
     publishedAt: config.publishedAt,
     updatedAt: config.updatedAt,
@@ -283,12 +295,13 @@ router.patch("/admin/homepage", requireAuth, requireRole("admin"), async (req, r
     return;
   }
   const config = await getHomepageConfig();
+  const normalized = normalizeHomepageContent(req.body);
   const [updated] = await db.update(homepageConfigsTable)
-    .set({ draftContent: req.body, updatedBy: req.user!.userId })
+    .set({ draftContent: normalized, updatedBy: req.user!.userId })
     .where(eq(homepageConfigsTable.id, config.id))
     .returning();
   await recordAudit(req, "saved_homepage_draft", "homepage", String(updated.id));
-  res.json({ id: updated.id, draftContent: updated.draftContent, publishedContent: updated.publishedContent, scheduledContent: updated.scheduledContent, scheduledAt: updated.scheduledAt, publishedAt: updated.publishedAt, updatedAt: updated.updatedAt });
+  res.json({ id: updated.id, draftContent: normalizeHomepageContent(updated.draftContent), publishedContent: updated.publishedContent ? normalizeHomepageContent(updated.publishedContent) : null, scheduledContent: updated.scheduledContent ? normalizeHomepageContent(updated.scheduledContent) : null, scheduledAt: updated.scheduledAt, publishedAt: updated.publishedAt, updatedAt: updated.updatedAt });
 });
 
 // POST /admin/homepage/publish

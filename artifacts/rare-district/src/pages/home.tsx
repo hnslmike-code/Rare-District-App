@@ -32,8 +32,49 @@ type HomepageContent = {
     release: string; visualLabel: string; location: string; proof: string[]; productIds: number[];
   };
   carousel: { eyebrow: string; title: string; productIds: number[]; autoplay: boolean };
+  ads?: HomepageAd[];
   sections: { latest: boolean; editorial: boolean; designers: boolean };
 };
+
+type HomepageAd = {
+  id: string;
+  mediaType: "image" | "video";
+  mediaUrl: string;
+  href: string;
+  alt: string;
+  active: boolean;
+  duration: number;
+};
+
+function adMediaUrl(url: string) {
+  if (url.startsWith("/objects/")) return `/api/storage${url}`;
+  return url.startsWith("http") || url.startsWith("/") ? url : `/api/storage/objects/${url}`;
+}
+
+function AdvertisingCarousel({ ads }: { ads: HomepageAd[] }) {
+  const activeAds = ads.filter(ad => ad.active && ad.mediaUrl);
+  const [index, setIndex] = useState(0);
+  const current = activeAds[index];
+  useEffect(() => {
+    if (index >= activeAds.length) setIndex(0);
+  }, [activeAds.length, index]);
+  useEffect(() => {
+    if (activeAds.length < 2 || !current || current.mediaType === "video") return;
+    const timer = window.setTimeout(() => setIndex(value => (value + 1) % activeAds.length), current.duration * 1000);
+    return () => window.clearTimeout(timer);
+  }, [activeAds.length, current]);
+  if (!current) return null;
+  const media = current.mediaType === "video"
+    ? <video src={adMediaUrl(current.mediaUrl)} autoPlay muted loop playsInline aria-label={current.alt} />
+    : <img src={adMediaUrl(current.mediaUrl)} alt={current.alt} />;
+  const content = current.href ? <a href={current.href} className="homepage-ad-link">{media}</a> : media;
+  return (
+    <section className="homepage-ad-section" aria-label="Featured advertising">
+      <div className="homepage-ad-frame">{content}</div>
+      {activeAds.length > 1 && <div className="homepage-ad-dots" aria-label="Advertising slides">{activeAds.map((ad, adIndex) => <button key={ad.id} onClick={() => setIndex(adIndex)} className={adIndex === index ? "is-active" : ""} aria-label={`Show advertisement ${adIndex + 1}`} />)}</div>}
+    </section>
+  );
+}
 
 type BrandVendor = {
   id: number;
@@ -321,7 +362,7 @@ export default function Home() {
         {newest.isLoading ? <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="aspect-[3/4]" />)}</div> : <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">{products.slice(0, 4).map((product) => <ProductCard key={product.id} product={product} showWardrobe={false} dataTestId={`home-product-${product.id}`} />)}</div>}
       </section>}
 
-      {(content?.sections.editorial ?? true) && <section className="editorial-band"><div className="editorial-band-inner container mx-auto px-4 py-20 md:px-6 md:py-28"><div className="editorial-band-copy"><p className="eyebrow">The house edit</p><h2>Find the brand<br /><em>before the trend.</em></h2><div className="editorial-band-body"><p>Rare District brings the ateliers, cult labels, and emerging voices of contemporary African fashion into one considered marketplace.</p><Link href="/shop?category=designers" className="editorial-band-link">Meet the designers <ArrowRight className="h-4 w-4" /></Link></div></div></div></section>}
+      {(content?.sections.editorial ?? true) && <AdvertisingCarousel ads={content?.ads ?? []} />}
 
       {(content?.sections.designers ?? true) && <section className="brand-directory-section container mx-auto px-4 py-20 md:px-6 md:py-28">
         <div className="section-heading"><div><p className="eyebrow">The ateliers</p><h2>Start with a name.</h2></div><Link href="/shop?category=designers" className="text-xs font-bold uppercase tracking-[0.2em] hover:underline">View all <ArrowRight className="ml-2 inline h-3.5 w-3.5" /></Link></div>

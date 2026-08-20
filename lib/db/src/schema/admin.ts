@@ -36,6 +36,15 @@ export type HomepageContent = {
     productIds: number[];
     autoplay: boolean;
   };
+  ads: Array<{
+    id: string;
+    mediaType: "image" | "video";
+    mediaUrl: string;
+    href: string;
+    alt: string;
+    active: boolean;
+    duration: number;
+  }>;
   sections: {
     latest: boolean;
     editorial: boolean;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useListAdminProducts } from "@workspace/api-client-react";
-import { Check, Clock3, Eye, Loader2, Save, Send, SlidersHorizontal } from "lucide-react";
+import { Check, Clock3, Eye, Loader2, Plus, Save, Send, SlidersHorizontal, Trash2, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { adminJson } from "@/lib/admin-control";
 
@@ -12,6 +12,7 @@ type HomepageContent = {
     release: string; visualLabel: string; location: string; proof: string[]; productIds: number[];
   };
   carousel: { eyebrow: string; title: string; productIds: number[]; autoplay: boolean };
+  ads: Array<{ id: string; mediaType: "image" | "video"; mediaUrl: string; href: string; alt: string; active: boolean; duration: number }>;
   sections: { latest: boolean; editorial: boolean; designers: boolean };
 };
 
@@ -33,6 +34,7 @@ export default function AdminMerchandising() {
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<HomepageContent | null>(null);
   const [scheduleAt, setScheduleAt] = useState("");
+  const [uploadingAd, setUploadingAd] = useState(false);
   const config = useQuery({
     queryKey: ["admin-homepage"],
     queryFn: () => adminJson<HomepageConfig>("/api/admin/homepage"),
@@ -66,6 +68,49 @@ export default function AdminMerchandising() {
   const changeHero = <K extends keyof HomepageContent["hero"]>(key: K, value: HomepageContent["hero"][K]) => setDraft(current => current ? { ...current, hero: { ...current.hero, [key]: value } } : current);
   const changeCarousel = <K extends keyof HomepageContent["carousel"]>(key: K, value: HomepageContent["carousel"][K]) => setDraft(current => current ? { ...current, carousel: { ...current.carousel, [key]: value } } : current);
   const changeSection = (key: keyof HomepageContent["sections"], value: boolean) => setDraft(current => current ? { ...current, sections: { ...current.sections, [key]: value } } : current);
+  const changeAd = <K extends keyof HomepageContent["ads"][number]>(id: string, key: K, value: HomepageContent["ads"][number][K]) => setDraft(current => current ? { ...current, ads: current.ads.map(ad => ad.id === id ? { ...ad, [key]: value } : ad) } : current);
+
+  const uploadAd = async (file: File) => {
+    if (!draft) return;
+    const isVideo = file.type.startsWith("video/");
+    if (!file.type.startsWith("image/") && !isVideo) {
+      toast({ title: "Unsupported ad file", description: "Upload an image or video file.", variant: "destructive" });
+      return;
+    }
+    if (file.size > 50 * 1024 * 1024) {
+      toast({ title: "Ad file is too large", description: "Keep ad media under 50MB.", variant: "destructive" });
+      return;
+    }
+    setUploadingAd(true);
+    try {
+      const request = await fetch("/api/storage/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+      });
+      if (!request.ok) throw new Error("Could not prepare the upload.");
+      const { uploadURL, objectPath } = await request.json();
+      const upload = await fetch(uploadURL, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
+      if (!upload.ok) throw new Error("The media upload did not complete.");
+      setDraft(current => current ? {
+        ...current,
+        ads: [...current.ads, {
+          id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
+          mediaType: isVideo ? "video" : "image",
+          mediaUrl: objectPath,
+          href: "/",
+          alt: file.name.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " "),
+          active: true,
+          duration: 6,
+        }],
+      } : current);
+      toast({ title: "Ad media uploaded", description: "Save the draft when your campaign is ready." });
+    } catch (error) {
+      toast({ title: "Ad upload failed", description: error instanceof Error ? error.message : "Try again.", variant: "destructive" });
+    } finally {
+      setUploadingAd(false);
+    }
+  };
 
   const toggleProduct = (target: "hero" | "carousel", productId: number, limit: number) => {
     if (!draft) return;
@@ -110,6 +155,32 @@ export default function AdminMerchandising() {
               <label className={labelClass}>Secondary CTA<input value={draft.hero.secondaryLabel} onChange={event => changeHero("secondaryLabel", event.target.value)} className={inputClass} /></label>
               <label className={labelClass}>Secondary link<input value={draft.hero.secondaryHref} onChange={event => changeHero("secondaryHref", event.target.value)} className={inputClass} /></label>
             </div>
+          </div>
+
+          <div className="border border-border p-5 md:p-6">
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+              <div><h2 className="font-serif text-2xl">Homepage advertising</h2><p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">Upload image or video campaigns. The media is the entire clickable ad; use the destination field to decide where it leads.</p></div>
+              <label className="inline-flex cursor-pointer items-center gap-2 bg-foreground px-3 py-2 text-xs font-bold uppercase tracking-widest text-background hover:bg-foreground/85">
+                <Upload className="h-3.5 w-3.5" /> {uploadingAd ? "Uploading…" : "Add media"}
+                <input type="file" accept="image/*,video/*" className="hidden" disabled={uploadingAd} onChange={event => { const file = event.target.files?.[0]; if (file) void uploadAd(file); event.currentTarget.value = ""; }} />
+              </label>
+            </div>
+            {draft.ads.length === 0 ? <div className="border border-dashed border-border px-5 py-10 text-center text-sm text-muted-foreground"><Plus className="mx-auto mb-3 h-5 w-5" />No campaigns yet. Add the first homepage advertisement.</div> : <div className="space-y-4">
+              {draft.ads.map((ad, index) => (
+                <div key={ad.id} className={`grid gap-4 border p-3 md:grid-cols-[10rem_1fr_auto] ${ad.active ? "border-foreground/40" : "border-border opacity-60"}`}>
+                  <div className="aspect-video overflow-hidden bg-secondary">
+                    {ad.mediaType === "video" ? <video src={ad.mediaUrl.startsWith("/") ? `/api/storage${ad.mediaUrl}` : `/api/storage/objects/${ad.mediaUrl}`} muted playsInline /> : <img src={ad.mediaUrl.startsWith("/") ? `/api/storage${ad.mediaUrl}` : `/api/storage/objects/${ad.mediaUrl}`} alt="" className="h-full w-full object-cover" />}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className={labelClass}>Alt text<input value={ad.alt} onChange={event => changeAd(ad.id, "alt", event.target.value)} className={inputClass} /></label>
+                    <label className={labelClass}>Destination URL<input value={ad.href} onChange={event => changeAd(ad.id, "href", event.target.value)} className={inputClass} placeholder="/shop or https://…" /></label>
+                    <label className={labelClass}>Seconds on screen<input type="number" min={2} max={30} value={ad.duration} onChange={event => changeAd(ad.id, "duration", Number(event.target.value))} className={inputClass} /></label>
+                    <label className="flex cursor-pointer items-center gap-2 self-end border border-border px-3 py-2.5 text-xs font-bold uppercase tracking-widest"><input type="checkbox" checked={ad.active} onChange={event => changeAd(ad.id, "active", event.target.checked)} /> Active</label>
+                  </div>
+                  <button onClick={() => setDraft(current => current ? { ...current, ads: current.ads.filter(item => item.id !== ad.id) } : current)} className="self-start p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive" aria-label={`Remove advertisement ${index + 1}`}><Trash2 className="h-4 w-4" /></button>
+                </div>
+              ))}
+            </div>}
           </div>
 
           <div className="border border-border p-5 md:p-6">

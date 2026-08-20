@@ -22,6 +22,7 @@ const storefrontHomepageFallback: HomepageContent = {
     productIds: [],
   },
   carousel: { eyebrow: "The district edit / 01", title: "Pieces with presence.", productIds: [], autoplay: true },
+  ads: [],
   sections: { latest: true, editorial: true, designers: true },
 };
 
@@ -29,7 +30,8 @@ const storefrontHomepageFallback: HomepageContent = {
 router.get("/storefront/homepage", async (_req, res): Promise<void> => {
   const [config] = await db.select().from(homepageConfigsTable).orderBy(desc(homepageConfigsTable.id)).limit(1);
   const scheduledIsLive = Boolean(config?.scheduledContent && config.scheduledAt && config.scheduledAt <= new Date());
-  const content = (scheduledIsLive ? config?.scheduledContent : config?.publishedContent) ?? storefrontHomepageFallback;
+  const rawContent = (scheduledIsLive ? config?.scheduledContent : config?.publishedContent) ?? storefrontHomepageFallback;
+  const content = { ...rawContent, ads: Array.isArray(rawContent.ads) ? rawContent.ads : [] };
   res.json({ content, publishedAt: scheduledIsLive ? config?.scheduledAt : config?.publishedAt, source: scheduledIsLive ? "scheduled" : config?.publishedContent ? "published" : "fallback" });
 });
 

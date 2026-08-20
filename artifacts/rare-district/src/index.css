@@ -276,6 +276,15 @@ button.bg-primary, a.bg-primary { box-shadow: 0 8px 24px hsl(var(--primary) / .1
 .editorial-band-link { display: inline-flex; align-items: center; gap: .75rem; margin-top: clamp(2.4rem, 4.5vw, 4.2rem); color: #17191a; font-family: 'Space Grotesk', var(--app-font-sans); font-size: .76rem; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; transition: gap .25s ease; }
 .editorial-band-link:hover { gap: 1.05rem; }
 .brand-directory-section { overflow: hidden; }
+.homepage-ad-section { background: #e9e6df; padding: clamp(2rem, 5vw, 5rem) 1rem; }
+.homepage-ad-frame { position: relative; width: min(100%, 90rem); margin: 0 auto; overflow: hidden; background: #dedbd4; }
+.homepage-ad-link, .homepage-ad-frame img, .homepage-ad-frame video { display: block; width: 100%; }
+.homepage-ad-frame img, .homepage-ad-frame video { max-height: 42rem; object-fit: cover; }
+.homepage-ad-link { transition: opacity .3s ease; }
+.homepage-ad-link:hover { opacity: .92; }
+.homepage-ad-dots { display: flex; justify-content: center; gap: .5rem; padding-top: 1.25rem; }
+.homepage-ad-dots button { height: .35rem; width: .35rem; border-radius: 999px; background: rgba(18,20,22,.28); transition: width .25s ease, background .25s ease; }
+.homepage-ad-dots button.is-active { width: 1.5rem; background: #121416; }
 .brand-directory { overflow: hidden; margin-inline: -1rem; }
 .brand-directory-track { display: flex; gap: clamp(1.5rem, 3.5vw, 3.5rem); overflow-x: auto; padding: .75rem 1rem 1.5rem; scrollbar-width: none; }
 .brand-directory-track::-webkit-scrollbar { display: none; }
